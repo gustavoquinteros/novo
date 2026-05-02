@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Meta Quest — 360º Route POV</title>
+  <title>HUBTOWN — 360° Route POV</title>
 
   <script type="importmap">
     {
@@ -19,23 +19,23 @@
       --blue: #14b9ff;
       --soft: #d5e0ff;
       --violet: #6f7dff;
-      --line: rgba(213, 224, 255, .14);
+      --line: rgba(213,224,255,.14);
     }
 
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
-      margin: 0;
       width: 100%;
       min-height: 100%;
       background: var(--dark);
       color: var(--soft);
-      font-family: Arial, Helvetica, sans-serif;
+      font-family: 'Courier New', Courier, monospace;
       overflow-x: hidden;
     }
 
-    body { height: 1200vh; }
-    body.is-xr { height: 100vh; overflow: hidden; }
+    /* scroll height only in screen mode */
+    body.scroll-mode { height: 1200vh; }
+    body.vr-mode     { height: 100vh; overflow: hidden; }
 
     canvas {
       position: fixed;
@@ -43,16 +43,14 @@
       width: 100vw;
       height: 100vh;
       display: block;
-      background: radial-gradient(circle at 50% 35%, #0a2446, #020817 58%, #01040d);
       opacity: 0;
       transition: opacity .7s ease;
       z-index: 0;
     }
-
     body.is-ready canvas { opacity: 1; }
 
-    .mode-gate,
-    .loader {
+    /* ── GATE ── */
+    .mode-gate {
       position: fixed;
       inset: 0;
       z-index: 100;
@@ -64,28 +62,25 @@
         linear-gradient(180deg, #020817, #01040d);
       transition: opacity .55s ease, visibility .55s ease;
     }
+    .mode-gate.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 
-    .mode-gate.is-hidden,
-    .loader.is-hidden {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-    }
-
+    /* ── LOADER ── */
     .loader {
+      position: fixed;
+      inset: 0;
+      z-index: 99;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(180deg, #020817, #01040d);
       opacity: 0;
       visibility: hidden;
+      transition: opacity .4s ease, visibility .4s ease;
     }
-
-    .loader.is-active {
-      opacity: 1;
-      visibility: visible;
-    }
+    .loader.active { opacity: 1; visibility: visible; }
 
     .panel {
       width: min(540px, calc(100vw - 44px));
       text-align: center;
-      color: var(--soft);
     }
 
     .logo {
@@ -94,7 +89,8 @@
       font-weight: 900;
       letter-spacing: .44em;
       text-transform: uppercase;
-      text-shadow: 0 0 28px rgba(20,185,255,.45);
+      text-shadow: 0 0 28px rgba(20,185,255,.6);
+      color: var(--blue);
     }
 
     h1 {
@@ -103,6 +99,7 @@
       line-height: .92;
       letter-spacing: .08em;
       text-transform: uppercase;
+      color: var(--soft);
     }
 
     p {
@@ -110,7 +107,7 @@
       margin: 0 auto 30px;
       color: rgba(213,224,255,.66);
       line-height: 1.65;
-      font-size: 15px;
+      font-size: 14px;
     }
 
     .actions {
@@ -122,27 +119,29 @@
 
     button {
       appearance: none;
-      border: 1px solid rgba(213,224,255,.2);
+      border: 1px solid rgba(213,224,255,.22);
       color: var(--soft);
       background: rgba(213,224,255,.07);
       backdrop-filter: blur(16px);
       padding: 18px 22px;
       cursor: pointer;
+      font-family: inherit;
       font-size: 11px;
       letter-spacing: .2em;
       text-transform: uppercase;
       font-weight: 900;
       clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+      transition: background .2s, box-shadow .2s;
     }
-
+    button:hover { background: rgba(213,224,255,.14); }
     button.primary {
       color: #020817;
       background: var(--soft);
-      box-shadow: 0 0 40px rgba(20,185,255,.25);
+      box-shadow: 0 0 40px rgba(20,185,255,.35);
     }
+    button.primary:hover { box-shadow: 0 0 60px rgba(20,185,255,.6); }
 
-    .note,
-    .loader-status {
+    .note {
       margin-top: 16px;
       min-height: 18px;
       color: rgba(213,224,255,.42);
@@ -152,6 +151,7 @@
       text-transform: uppercase;
     }
 
+    /* loader bar */
     .loader-label {
       display: flex;
       justify-content: space-between;
@@ -162,15 +162,12 @@
       text-transform: uppercase;
       color: rgba(213,224,255,.62);
     }
-
     .loader-track {
       height: 6px;
-      width: 100%;
       background: rgba(213,224,255,.1);
       border: 1px solid rgba(213,224,255,.14);
       overflow: hidden;
     }
-
     .loader-fill {
       height: 100%;
       width: 0%;
@@ -178,57 +175,51 @@
       box-shadow: 0 0 24px rgba(20,185,255,.8);
       transition: width .25s ease;
     }
+    .loader-status {
+      margin-top: 12px;
+      color: rgba(213,224,255,.42);
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
 
+    /* ── HUD (screen mode only) ── */
     .overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 2;
+      position: fixed; inset: 0; z-index: 2;
       pointer-events: none;
-      opacity: 0;
-      transition: opacity .8s ease;
+      opacity: 0; transition: opacity .8s;
       background:
         radial-gradient(circle at 50% 46%, transparent 0 38%, rgba(0,0,0,.28) 68%, rgba(0,0,0,.76) 100%),
-        repeating-linear-gradient(0deg, rgba(213,224,255,.05) 0 1px, transparent 1px 5px);
+        repeating-linear-gradient(0deg, rgba(213,224,255,.04) 0 1px, transparent 1px 5px);
       mix-blend-mode: screen;
     }
-
-    .hud,
-    .progress,
-    .title-ui {
-      position: fixed;
-      z-index: 3;
+    .hud, .progress-box, .title-ui {
+      position: fixed; z-index: 3;
       pointer-events: none;
-      opacity: 0;
-      transition: opacity .8s ease;
+      opacity: 0; transition: opacity .8s;
     }
-
     body.is-ready .overlay,
     body.is-ready .hud,
-    body.is-ready .progress,
+    body.is-ready .progress-box,
     body.is-ready .title-ui { opacity: 1; }
-
-    body.is-xr .overlay,
-    body.is-xr .hud,
-    body.is-xr .progress,
-    body.is-xr .title-ui { display: none; }
+    body.vr-mode .overlay,
+    body.vr-mode .hud,
+    body.vr-mode .progress-box,
+    body.vr-mode .title-ui { display: none; }
 
     .title-ui {
-      left: 50%;
-      bottom: 14vh;
+      left: 50%; bottom: 14vh;
       width: min(720px, calc(100vw - 48px));
       transform: translateX(-50%);
       text-align: center;
     }
-
     .title-ui .eyebrow {
       margin-bottom: 14px;
-      font-size: 11px;
-      font-weight: 900;
+      font-size: 11px; font-weight: 900;
       letter-spacing: .28em;
-      color: rgba(213,224,255,.58);
+      color: rgba(213,224,255,.55);
       text-transform: uppercase;
     }
-
     .title-ui h2 {
       margin: 0;
       font-size: clamp(32px, 4vw, 58px);
@@ -237,696 +228,696 @@
       text-transform: uppercase;
       text-shadow: 0 0 42px rgba(20,185,255,.42);
     }
-
     .title-ui small {
       display: block;
       margin-top: 20px;
-      color: rgba(213,224,255,.56);
-      letter-spacing: .12em;
+      color: rgba(213,224,255,.5);
+      letter-spacing: .14em;
       text-transform: uppercase;
+      font-size: 11px;
     }
 
     .hud {
-      left: 42px;
-      bottom: 44px;
-      display: grid;
-      gap: 8px;
+      left: 42px; bottom: 44px;
+      display: grid; gap: 8px;
       color: rgba(213,224,255,.55);
-      font-size: 10px;
-      font-weight: 900;
+      font-size: 10px; font-weight: 900;
       letter-spacing: .18em;
       text-transform: uppercase;
     }
 
-    .progress {
-      right: 42px;
-      bottom: 44px;
-      width: 260px;
-      padding: 16px;
-      background: rgba(2,8,23,.55);
+    .progress-box {
+      right: 42px; bottom: 44px;
+      width: 260px; padding: 16px;
+      background: rgba(2,8,23,.6);
       border: 1px solid rgba(213,224,255,.12);
       backdrop-filter: blur(20px);
       clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
     }
-
     .progress-row {
       display: flex;
       justify-content: space-between;
       margin-bottom: 10px;
       color: rgba(213,224,255,.58);
-      font-size: 10px;
-      font-weight: 900;
+      font-size: 10px; font-weight: 900;
       letter-spacing: .16em;
       text-transform: uppercase;
     }
-
-    .track {
-      height: 4px;
-      background: rgba(213,224,255,.12);
-      overflow: hidden;
-    }
-
+    .track { height: 4px; background: rgba(213,224,255,.12); overflow: hidden; }
     .fill {
-      width: 0%;
-      height: 100%;
+      width: 0%; height: 100%;
       background: var(--soft);
       box-shadow: 0 0 16px rgba(20,185,255,.9);
+      transition: width .1s;
     }
   </style>
 </head>
 <body>
-  <section class="mode-gate" id="modeGate">
-    <div class="panel">
-      <div class="logo">HUBTOWN</div>
-      <h1>Entrar em<br>modo 360°?</h1>
-      <p>No Meta Quest, a experiência entra em WebXR e você assume o ponto de vista do percurso. O gatilho traseiro direito avança pela estrada luminosa.</p>
-      <div class="actions">
-        <button class="primary" id="enterVrBtn">Entrar em 360° fullscreen</button>
-        <button id="screenBtn">Continuar no modo tela</button>
-      </div>
-      <div class="note" id="gateNote">Modo tela: scroll, espaço, W ou seta para cima.</div>
+
+<!-- MODE GATE -->
+<section class="mode-gate" id="modeGate">
+  <div class="panel">
+    <div class="logo">HUBTOWN</div>
+    <h1>Rota 360°<br>POV</h1>
+    <p>No Meta Quest, a experiência entra em WebXR imersivo — você assume o ponto de vista do percurso. O gatilho direito avança. O movimento da cabeça é rastreado 100%.</p>
+    <div class="actions">
+      <button class="primary" id="enterVrBtn">▶ Entrar em modo VR (Meta Quest)</button>
+      <button id="screenBtn">Continuar no modo tela</button>
     </div>
-  </section>
+    <div class="note" id="gateNote">Modo tela: scroll · espaço · W · seta cima</div>
+  </div>
+</section>
 
-  <div class="loader is-hidden" id="loader">
-    <div class="panel">
-      <div class="logo">HUBTOWN</div>
-      <div class="loader-label"><span id="loaderStep">preparing scene</span><span id="loaderPercent">0%</span></div>
-      <div class="loader-track"><div class="loader-fill" id="loaderFill"></div></div>
-      <div class="loader-status" id="loaderStatus">building world</div>
+<!-- LOADER -->
+<div class="loader" id="loader">
+  <div class="panel">
+    <div class="logo">HUBTOWN</div>
+    <div class="loader-label">
+      <span id="loaderStep">preparando cena</span>
+      <span id="loaderPct">0%</span>
     </div>
+    <div class="loader-track"><div class="loader-fill" id="loaderFill"></div></div>
+    <div class="loader-status" id="loaderStatus">inicializando</div>
   </div>
+</div>
 
-  <canvas id="scene"></canvas>
-  <div class="overlay"></div>
+<!-- CANVAS -->
+<canvas id="scene"></canvas>
+<div class="overlay"></div>
 
-  <div class="title-ui" id="titleUi">
-    <div class="eyebrow" id="eyebrow">POV Route</div>
-    <h2 id="titleText">From above,<br>become the route</h2>
-    <small id="hintText">Scroll / Space / Right Trigger</small>
-  </div>
+<!-- HUD (screen mode only) -->
+<div class="title-ui" id="titleUi">
+  <div class="eyebrow" id="eyebrow">POV Route</div>
+  <h2 id="titleText">De cima,<br>torna-se o percurso</h2>
+  <small id="hintText">Scroll / Espaço / Gatilho Direito</small>
+</div>
 
-  <div class="hud">
-    <span id="hudAltitude">altitude 000</span>
-    <span id="hudSpeed">trigger 000</span>
-    <span id="hudSignal">mode loading</span>
-  </div>
+<div class="hud">
+  <span id="hudAlt">altitude 000</span>
+  <span id="hudSpd">gatilho 000</span>
+  <span id="hudMode">modo carregando</span>
+</div>
 
-  <div class="progress">
-    <div class="progress-row"><span>Route progress</span><span id="percent">0%</span></div>
-    <div class="track"><div class="fill" id="fill"></div></div>
-  </div>
+<div class="progress-box">
+  <div class="progress-row"><span>Progresso</span><span id="pct">0%</span></div>
+  <div class="track"><div class="fill" id="fill"></div></div>
+</div>
 
-  <script type="module">
-    import * as THREE from 'three';
+<script type="module">
+import * as THREE from 'three';
 
-    const dom = {
-      canvas: document.getElementById('scene'),
-      modeGate: document.getElementById('modeGate'),
-      enterVrBtn: document.getElementById('enterVrBtn'),
-      screenBtn: document.getElementById('screenBtn'),
-      gateNote: document.getElementById('gateNote'),
-      loader: document.getElementById('loader'),
-      loaderStep: document.getElementById('loaderStep'),
-      loaderPercent: document.getElementById('loaderPercent'),
-      loaderFill: document.getElementById('loaderFill'),
-      loaderStatus: document.getElementById('loaderStatus'),
-      fill: document.getElementById('fill'),
-      percent: document.getElementById('percent'),
-      hudAltitude: document.getElementById('hudAltitude'),
-      hudSpeed: document.getElementById('hudSpeed'),
-      hudSignal: document.getElementById('hudSignal'),
-      eyebrow: document.getElementById('eyebrow'),
-      titleText: document.getElementById('titleText'),
-      hintText: document.getElementById('hintText')
-    };
+// ─── DOM refs ────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const dom = {
+  canvas:      $('scene'),
+  gate:        $('modeGate'),
+  enterVrBtn:  $('enterVrBtn'),
+  screenBtn:   $('screenBtn'),
+  gateNote:    $('gateNote'),
+  loader:      $('loader'),
+  loaderStep:  $('loaderStep'),
+  loaderPct:   $('loaderPct'),
+  loaderFill:  $('loaderFill'),
+  loaderStatus:$('loaderStatus'),
+  fill:        $('fill'),
+  pct:         $('pct'),
+  hudAlt:      $('hudAlt'),
+  hudSpd:      $('hudSpd'),
+  hudMode:     $('hudMode'),
+  hintText:    $('hintText'),
+};
 
-    const PATH_START = -80;
-    const PATH_END = 960;
-    const MOVE_SPEED = 0.055;
+// ─── State ───────────────────────────────────────────────────────────────────
+const PATH_START = -80, PATH_END = 960;
+const MOVE_SPEED = 0.055;
 
-    let targetProgress = 0;
-    let smoothProgress = 0;
-    let selectedMode = 'screen';
-    let appStarted = false;
-    let loaderProgress = 0;
-    let keyboardThrottle = false;
-    let rightTriggerFallback = false;
+let mode          = 'screen'; // 'screen' | 'vr'
+let appStarted    = false;
+let xrSession     = null;
+let xrRefSpace    = null;
+let targetProgress  = 0;
+let smoothProgress  = 0;
+let loadPct       = 0;
+let keyDown       = false; // keyboard throttle
 
-    const clock = new THREE.Clock();
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x020817, 0.0025);
+// ─── Three.js core ───────────────────────────────────────────────────────────
+const clock  = new THREE.Clock();
+const scene  = new THREE.Scene();
+scene.fog    = new THREE.FogExp2(0x020817, 0.0025);
 
-    const playerRig = new THREE.Group();
-    playerRig.name = 'player-pov-rig';
-    scene.add(playerRig);
+/**
+ * Player rig: holds the camera.
+ * In SCREEN mode: we manually position + orient it along the path.
+ * In VR mode:   we position it along the path but DO NOT touch orientation —
+ *               the WebXR manager takes full control of the camera quaternion/position
+ *               from the headset tracking data.
+ */
+const playerRig = new THREE.Group();
+playerRig.name  = 'player-rig';
+scene.add(playerRig);
 
-    const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.05, 1800);
-    camera.name = 'pov-camera';
+const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 1800);
+camera.name  = 'pov-cam';
+camera.position.set(0, 1.62, 0);
+playerRig.add(camera);
+
+const renderer = new THREE.WebGLRenderer({
+  canvas: dom.canvas,
+  antialias: true,
+  alpha: true,
+  powerPreference: 'high-performance',
+});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping      = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.18;
+renderer.xr.enabled = true;          // ← Required for WebXR to work
+
+// ─── Lights ──────────────────────────────────────────────────────────────────
+const hemi     = new THREE.HemisphereLight(0x8fdfff, 0x020817, 1.9);
+const sun      = new THREE.DirectionalLight(0xd5e0ff, 2.2);
+sun.position.set(-80, 160, -40);
+const povLight = new THREE.PointLight(0x16bdff, 10, 140, 1.8);
+const rimLight = new THREE.PointLight(0x6f7dff,  6, 280, 2.0);
+scene.add(hemi, sun, povLight, rimLight);
+
+// ─── Route math ──────────────────────────────────────────────────────────────
+function routeX(z, off = 0) {
+  return Math.sin(z * .019 + off) * 58
+       + Math.sin(z * .0065 + off * 2.2) * 42
+       + Math.cos(z * .044  + off) * 10;
+}
+function terrainH(x, z) {
+  const road  = routeX(z);
+  const lr    = Math.exp(-Math.pow((x + 96 + Math.sin(z * .017) * 34) / 52, 2)) * 32;
+  const rr    = Math.exp(-Math.pow((x - 94 + Math.cos(z * .014) * 30) / 58, 2)) * 29;
+  const fr    = Math.exp(-Math.pow((x + Math.sin(z * .012) * 120) / 132, 2)) * 12;
+  const rv    = -Math.exp(-Math.pow((x - road) / 30, 2)) * 8.5;
+  const wav   = Math.sin(x * .052 + z * .017) * 4.1 + Math.cos(x * .022 - z * .029) * 4.5;
+  const slope = Math.sin(z * .005) * 6;
+  return lr + rr + fr + rv + wav + slope - 12;
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp(v, lo = 0, hi = 1) { return Math.max(lo, Math.min(hi, v)); }
+function eio(t) { return t < .5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2; }
+
+class RoadCurve extends THREE.Curve {
+  getPoint(t, out = new THREE.Vector3()) {
+    const z = lerp(PATH_START, PATH_END, t);
+    const x = routeX(z);
+    return out.set(x, terrainH(x, z) + 1.8, z);
+  }
+}
+class OffsetCurve extends THREE.Curve {
+  constructor(off) { super(); this.off = off; }
+  getPoint(t, out = new THREE.Vector3()) {
+    const z = lerp(PATH_START, PATH_END, t);
+    const x = routeX(z);
+    const dx = routeX(z + 4) - routeX(z - 4);
+    const s  = new THREE.Vector3(1, 0, -dx / 8).normalize();
+    const ox = s.x * this.off, oz = s.z * this.off;
+    return out.set(x + ox, terrainH(x + ox, z + oz) + 2, z + oz);
+  }
+}
+const roadCurve = new RoadCurve();
+
+// ─── Load progress ───────────────────────────────────────────────────────────
+function setLoad(v, step = '', status = '') {
+  loadPct = Math.max(loadPct, Math.min(100, v));
+  dom.loaderFill.style.width = loadPct + '%';
+  dom.loaderPct.textContent  = Math.round(loadPct) + '%';
+  if (step)   dom.loaderStep.textContent   = step;
+  if (status) dom.loaderStatus.textContent = status;
+}
+
+// ─── Scene builders ──────────────────────────────────────────────────────────
+const mesh = {};   // named meshes we may animate
+
+function buildSky() {
+  const N = 1300, pos = new Float32Array(N*3), col = new Float32Array(N*3);
+  for (let i=0;i<N;i++) {
+    const r = 420 + Math.random()*680, a = Math.random()*Math.PI*2;
+    pos[i*3]   = Math.cos(a)*r;
+    pos[i*3+1] = 80 + Math.random()*430;
+    pos[i*3+2] = PATH_START - 200 + Math.random()*(PATH_END-PATH_START+520);
+    const b = .55 + Math.random()*.45;
+    col[i*3] = .22*b; col[i*3+1] = .72*b; col[i*3+2] = 1;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  g.setAttribute('color',    new THREE.BufferAttribute(col,3));
+  mesh.stars = new THREE.Points(g, new THREE.PointsMaterial({size:1.8,vertexColors:true,transparent:true,opacity:.64,blending:THREE.AdditiveBlending,depthWrite:false}));
+  mesh.stars.name = 'sky';
+  scene.add(mesh.stars);
+}
+
+function buildTerrain() {
+  const xMin=-210,xMax=210,zMin=PATH_START-90,zMax=PATH_END+120,xS=96,zS=300;
+  const pos=[],col=[],idx=[];
+  for(let zi=0;zi<=zS;zi++){
+    const z=lerp(zMin,zMax,zi/zS);
+    for(let xi=0;xi<=xS;xi++){
+      const x=lerp(xMin,xMax,xi/xS),y=terrainH(x,z);
+      pos.push(x,y,z);
+      const glow=clamp(1-Math.abs(x-routeX(z))/120);
+      col.push(.02+glow*.04,.17+glow*.18,.34+glow*.55);
+    }
+  }
+  for(let zi=0;zi<zS;zi++){
+    for(let xi=0;xi<xS;xi++){
+      const a=zi*(xS+1)+xi;
+      idx.push(a,a+xS+1,a+1,a+1,a+xS+1,a+xS+2);
+    }
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('color',   new THREE.Float32BufferAttribute(col,3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  scene.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78,metalness:.08,emissive:0x03172b,emissiveIntensity:.42,transparent:true,opacity:.9})));
+  scene.add(new THREE.LineSegments(new THREE.WireframeGeometry(g),new THREE.LineBasicMaterial({color:0x14b9ff,transparent:true,opacity:.11,blending:THREE.AdditiveBlending})));
+}
+
+function buildRoad() {
+  const glowM = new THREE.MeshBasicMaterial({color:0x14b9ff,transparent:true,opacity:.18,blending:THREE.AdditiveBlending,depthWrite:false});
+  const lineM = new THREE.MeshBasicMaterial({color:0xd5e0ff,transparent:true,opacity:.98,blending:THREE.AdditiveBlending,depthWrite:false});
+  const haloM = new THREE.MeshBasicMaterial({color:0x0a72ff,transparent:true,opacity:.075,blending:THREE.AdditiveBlending,depthWrite:false});
+  [-9.2,-5.4,-2.7,0,2.7,5.4,9.2].forEach((off,i)=>{
+    const ctr = i===3;
+    const curve = new OffsetCurve(off);
+    const g = new THREE.Mesh(new THREE.TubeGeometry(curve,720,ctr?4.2:2.2,12,false),glowM.clone());
+    g.material.opacity = ctr?.32:.15; scene.add(g);
+    const l = new THREE.Mesh(new THREE.TubeGeometry(curve,720,ctr?.86:.38,8,false),lineM.clone());
+    l.material.opacity = ctr?1:.68;
+    if(ctr) l.name='road-center';
+    scene.add(l);
+    if(ctr) scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve,720,9.5,14,false),haloM.clone()));
+  });
+}
+
+mesh.auroras = [];
+function buildAuroras() {
+  const mats=[
+    new THREE.MeshBasicMaterial({color:0x14b9ff,transparent:true,opacity:.1,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}),
+    new THREE.MeshBasicMaterial({color:0x6f7dff,transparent:true,opacity:.075,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}),
+  ];
+  for(let r=0;r<4;r++){
+    const pts=[],side=r%2===0?-1:1;
+    for(let i=0;i<=84;i++){
+      const t=i/84,z=lerp(PATH_START-100,PATH_END+140,t);
+      pts.push(new THREE.Vector3(routeX(z)+side*(120+r*34+Math.sin(t*Math.PI*5+r)*18),54+Math.sin(t*Math.PI*4+r)*18+r*8,z));
+    }
+    const m=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),360,2.2+r*.35,8,false),mats[r%2].clone());
+    m.name=`aurora-${r}`; mesh.auroras.push(m); scene.add(m);
+  }
+}
+
+mesh.gates = [];
+function buildGates() {
+  const pt=new THREE.Vector3(),tan=new THREE.Vector3();
+  const mat=new THREE.MeshBasicMaterial({color:0x14b9ff,transparent:true,opacity:.22,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+  for(let i=0;i<18;i++){
+    const t=.08+i*.05;
+    roadCurve.getPoint(t,pt); roadCurve.getTangent(t,tan).normalize();
+    const g=new THREE.Mesh(new THREE.TorusGeometry(13+(i%3)*2,.18,8,72),mat.clone());
+    g.position.copy(pt).add(new THREE.Vector3(0,8+(i%2)*3,0));
+    g.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),tan);
+    g.userData={baseT:t,phase:Math.random()*Math.PI*2};
+    mesh.gates.push(g); scene.add(g);
+  }
+}
+
+mesh.flow = [];
+function buildFlow() {
+  const mat=new THREE.MeshBasicMaterial({color:0xd5e0ff,transparent:true,opacity:.82,blending:THREE.AdditiveBlending,depthWrite:false});
+  const lanes=[-5.4,-2.7,0,2.7,5.4];
+  for(let i=0;i<52;i++){
+    const orb=new THREE.Mesh(new THREE.SphereGeometry(.9+Math.random()*.9,10,10),mat.clone());
+    orb.userData={offset:Math.random(),speed:.045+Math.random()*.035,lane:lanes[i%5]};
+    mesh.flow.push(orb); scene.add(orb);
+  }
+}
+
+function buildTowers() {
+  const mat=new THREE.MeshStandardMaterial({color:0x15c7ff,emissive:0x0c6eaa,emissiveIntensity:.68,roughness:.42,metalness:.16,transparent:true,opacity:.5});
+  const glowM=new THREE.MeshBasicMaterial({color:0x6f7dff,transparent:true,opacity:.12,blending:THREE.AdditiveBlending,depthWrite:false});
+  for(let i=0;i<48;i++){
+    const z=PATH_START+70+i*20+Math.sin(i*1.6)*12;
+    const side=i%2===0?-1:1;
+    const x=routeX(z)+side*(48+Math.random()*105);
+    const y=terrainH(x,z);
+    const sx=6+Math.random()*16,sy=12+Math.random()*48,sz=6+Math.random()*16;
+    const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat.clone());
+    m.position.set(x,y+sy/2,z); m.rotation.y=Math.random()*Math.PI;
+    scene.add(m);
+    const gm=new THREE.Mesh(new THREE.BoxGeometry(sx*1.18,sy*1.08,sz*1.18),glowM.clone());
+    gm.position.copy(m.position); gm.rotation.copy(m.rotation); scene.add(gm);
+    m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry),new THREE.LineBasicMaterial({color:0xd5e0ff,transparent:true,opacity:.22,blending:THREE.AdditiveBlending})));
+  }
+}
+
+function buildDust() {
+  const N=900, pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    const z=PATH_START-60+Math.random()*(PATH_END-PATH_START+180);
+    const x=(Math.random()-.5)*430;
+    pos[i*3]=x; pos[i*3+1]=terrainH(x,z)+5+Math.random()*46; pos[i*3+2]=z;
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0x14b9ff,size:1.25,transparent:true,opacity:.56,blending:THREE.AdditiveBlending,depthWrite:false})));
+}
+
+function buildCockpit() {
+  // Cockpit frame added to camera (follows head in VR, follows cam in screen)
+  const grp=new THREE.Group(); grp.name='cockpit';
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.78,.006,8,96),new THREE.MeshBasicMaterial({color:0x14b9ff,transparent:true,opacity:.22,blending:THREE.AdditiveBlending,depthWrite:false}));
+  ring.position.set(0,0,-1.35); ring.scale.y=.52; grp.add(ring);
+  for(let i=0;i<8;i++){
+    const bar=new THREE.Mesh(new THREE.BoxGeometry(.12,.006,.006),new THREE.MeshBasicMaterial({color:0xd5e0ff,transparent:true,opacity:.36,blending:THREE.AdditiveBlending,depthWrite:false}));
+    const a=(i/8)*Math.PI*2;
+    bar.position.set(Math.cos(a)*.52,Math.sin(a)*.28,-1.34); bar.rotation.z=a;
+    grp.add(bar);
+  }
+  camera.add(grp);
+}
+
+// Trail
+const trailPts = Array.from({length:60},()=>new THREE.Vector3());
+const trailLine = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(trailPts),
+  new THREE.LineBasicMaterial({color:0xd5e0ff,transparent:true,opacity:.55,blending:THREE.AdditiveBlending})
+);
+trailLine.frustumCulled = false;
+scene.add(trailLine);
+
+// ─── INPUT: xr-standard mapping (Meta Quest) ─────────────────────────────────
+/**
+ * xr-standard button layout (Meta Quest 2/3/Pro):
+ *   buttons[0] = trigger (index finger) — ANALOG value 0–1
+ *   buttons[1] = grip (middle finger)
+ *   buttons[2] = N/A (touchpad, unused on Quest)
+ *   buttons[3] = thumbstick click
+ *   buttons[4] = A / X  (right / left)
+ *   buttons[5] = B / Y  (right / left)
+ *   axes[0,1]  = touchpad (unused)
+ *   axes[2,3]  = thumbstick X,Y
+ */
+function getRightTrigger() {
+  // VR mode: read from live XR input sources (correct way)
+  if (mode === 'vr' && xrSession) {
+    for (const src of xrSession.inputSources) {
+      if (src.handedness !== 'right') continue;
+      const gp = src.gamepad;
+      if (!gp) continue;
+      // Trigger = buttons[0], grip = buttons[1]
+      // Accept analog trigger OR full grip as "move"
+      const trigger = gp.buttons[0]?.value ?? 0;
+      const grip    = gp.buttons[1]?.value ?? 0;
+      return Math.max(trigger, grip);
+    }
+    return 0;
+  }
+  // Screen mode: keyboard
+  return keyDown ? 1 : 0;
+}
+
+function getRightThumbstick() {
+  // axes[2] = horizontal, axes[3] = vertical (forward = negative Y on Quest)
+  if (mode === 'vr' && xrSession) {
+    for (const src of xrSession.inputSources) {
+      if (src.handedness !== 'right') continue;
+      const gp = src.gamepad;
+      if (!gp || !gp.axes) continue;
+      return { x: gp.axes[2] ?? 0, y: gp.axes[3] ?? 0 };
+    }
+  }
+  return { x: 0, y: 0 };
+}
+
+// ─── Scroll (screen mode) ─────────────────────────────────────────────────────
+function syncScroll() {
+  const max = document.documentElement.scrollHeight - innerHeight;
+  targetProgress = max > 0 ? clamp(scrollY / max) : 0;
+}
+
+// ─── POV update ──────────────────────────────────────────────────────────────
+const _pt  = new THREE.Vector3();
+const _tan = new THREE.Vector3();
+const _flat= new THREE.Vector3();
+const _q   = new THREE.Quaternion();
+const _fwd = new THREE.Vector3(0,0,-1);
+const _up  = new THREE.Vector3(0,1,0);
+const _side= new THREE.Vector3();
+
+function updatePOV(triggerVal) {
+  const t    = eio(smoothProgress);
+  const pathT= clamp(t * .965 + .018);
+
+  roadCurve.getPoint(pathT, _pt);
+  roadCurve.getTangent(pathT, _tan).normalize();
+  _flat.set(_tan.x, 0, _tan.z).normalize();
+  _side.crossVectors(_up, _flat).normalize();
+  _q.setFromUnitVectors(_fwd, _flat);
+
+  const drop    = eio(clamp((smoothProgress - .02) / .25));
+  const altitude= lerp(112, 3.2, drop);
+
+  // Position the rig along the route
+  const target = new THREE.Vector3(_pt.x, _pt.y + altitude, _pt.z);
+  playerRig.position.lerp(target, mode === 'vr' ? .28 : .12);
+
+  /**
+   * CRITICAL VR FIX:
+   * In screen mode → rotate the rig to face along the route.
+   * In VR mode     → DO NOT touch playerRig.quaternion or camera.rotation.
+   *                  Three.js WebXR manager (renderer.xr) applies the headset
+   *                  pose directly to the camera every frame. If we overwrite it
+   *                  we break head-tracking sync completely.
+   */
+  if (mode === 'screen') {
+    playerRig.quaternion.slerp(_q, .14);
     camera.position.set(0, 1.62, 0);
-    playerRig.add(camera);
+    camera.rotation.x = THREE.MathUtils.degToRad(-4);
+  }
+  // In VR: rig is at the path position; headset rotation is applied on top by WebXR
+  // We only set the resting eye-height offset once (handled by 'local-floor' ref space)
 
-    const renderer = new THREE.WebGLRenderer({
-      canvas: dom.canvas,
-      antialias: true,
-      alpha: true,
-      powerPreference: 'high-performance'
-    });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.18;
-    renderer.xr.enabled = true;
+  // Lights follow rig
+  povLight.position.copy(playerRig.position).add(new THREE.Vector3(0, 6, 0));
+  rimLight.position.copy(playerRig.position)
+    .add(_side.clone().multiplyScalar(42))
+    .add(new THREE.Vector3(0, 28, -18));
 
-    const hemi = new THREE.HemisphereLight(0x8fdfff, 0x020817, 1.9);
-    const sun = new THREE.DirectionalLight(0xd5e0ff, 2.2);
-    sun.position.set(-80, 160, -40);
-    const povLight = new THREE.PointLight(0x16bdff, 10, 140, 1.8);
-    const rimLight = new THREE.PointLight(0x6f7dff, 6, 280, 2);
-    scene.add(hemi, sun, povLight, rimLight);
+  // Trail
+  for (let i=0;i<trailPts.length;i++) {
+    roadCurve.getPoint(clamp(pathT - i * .0016), trailPts[i]);
+    trailPts[i].y += 2.2;
+  }
+  trailLine.geometry.setFromPoints(trailPts);
+  trailLine.material.opacity = lerp(.14, .72, triggerVal);
 
-    const objects = { stars: null, auroras: [], gates: [], flow: [] };
-    const controllers = [];
+  // HUD
+  dom.hudAlt.textContent  = `altitude ${Math.round(playerRig.position.y).toString().padStart(3,'0')}`;
+  dom.hudSpd.textContent  = `gatilho  ${Math.round(triggerVal * 100).toString().padStart(3,'0')}`;
+  dom.hudMode.textContent = mode === 'vr' ? 'meta quest · gatilho' : 'tela · scroll/espaço';
+  dom.fill.style.width    = (smoothProgress * 100).toFixed(1) + '%';
+  dom.pct.textContent     = Math.round(smoothProgress * 100) + '%';
 
-    const tmp = {
-      point: new THREE.Vector3(),
-      tangent: new THREE.Vector3(),
-      flatTangent: new THREE.Vector3(),
-      side: new THREE.Vector3(),
-      quat: new THREE.Quaternion(),
-      forward: new THREE.Vector3(0, 0, -1),
-      up: new THREE.Vector3(0, 1, 0)
-    };
+  return pathT;
+}
 
-    function clamp(v, min = 0, max = 1) { return Math.max(min, Math.min(max, v)); }
-    function lerp(a, b, t) { return a + (b - a) * t; }
-    function easeInOut(t) { return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+function updateWorld(elapsed, pathT, triggerVal) {
+  if (mesh.stars) {
+    mesh.stars.rotation.y = elapsed * .008;
+    mesh.stars.material.opacity = lerp(.64, .38, smoothProgress);
+  }
+  mesh.auroras.forEach((r,i) => {
+    r.position.y = Math.sin(elapsed * .38 + i) * 2.2;
+    r.material.opacity = .06 + Math.sin(elapsed * .7 + i) * .018;
+  });
+  mesh.gates.forEach(g => {
+    const d = Math.abs(g.userData.baseT - pathT);
+    const prox = clamp(1 - d / .06);
+    g.material.opacity = .055 + prox * .52;
+    g.scale.setScalar(1 + prox * .32 + Math.sin(elapsed * 2.8 + g.userData.phase) * .025);
+    g.rotation.z += .006 + prox * .018;
+  });
+  mesh.flow.forEach((orb,i) => {
+    const ft = (pathT + orb.userData.offset * .08 + elapsed * orb.userData.speed + triggerVal * .01) % 1;
+    const z  = lerp(PATH_START, PATH_END, ft);
+    const x  = routeX(z);
+    const dx = routeX(z+4) - routeX(z-4);
+    const s  = new THREE.Vector3(1,0,-dx/8).normalize();
+    orb.position.set(x + s.x*orb.userData.lane, terrainH(x,z)+3.2+Math.sin(elapsed*4+i)*.5, z + s.z*orb.userData.lane);
+    orb.material.opacity = .12 + clamp(1 - Math.abs(ft-pathT)/.12) * .78;
+    orb.scale.setScalar(.8 + Math.sin(elapsed*5+i)*.18);
+  });
+}
 
-    function setLoadProgress(value, step = 'loading', status = '') {
-      loaderProgress = Math.max(loaderProgress, Math.min(100, value));
-      dom.loaderFill.style.width = `${loaderProgress.toFixed(0)}%`;
-      dom.loaderPercent.textContent = `${loaderProgress.toFixed(0)}%`;
-      dom.loaderStep.textContent = step;
-      if (status) dom.loaderStatus.textContent = status;
+// ─── Render loop ─────────────────────────────────────────────────────────────
+function renderLoop(timestamp, xrFrame) {
+  if (!appStarted) return;
+
+  const delta   = Math.min(clock.getDelta(), .05);
+  const elapsed = clock.elapsedTime;
+
+  // Progress advance
+  if (mode === 'vr') {
+    const trigger    = getRightTrigger();
+    const stick      = getRightThumbstick();
+    // Thumbstick forward (negative Y = push forward on Quest)
+    const stickFwd   = clamp(-stick.y, 0, 1);
+    const input      = Math.max(trigger, stickFwd);
+    targetProgress   = clamp(targetProgress + delta * MOVE_SPEED * input);
+    smoothProgress  += (targetProgress - smoothProgress) * .18;
+    updatePOV(input);
+    updateWorld(elapsed, clamp(eio(smoothProgress) * .965 + .018), input);
+  } else {
+    // Screen: driven by scroll + keyboard
+    syncScroll();
+    if (keyDown) targetProgress = clamp(targetProgress + delta * MOVE_SPEED);
+    const kv = keyDown ? 1 : 0;
+    smoothProgress += (targetProgress - smoothProgress) * .06;
+    updatePOV(kv);
+    updateWorld(elapsed, clamp(eio(smoothProgress) * .965 + .018), kv);
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ─── Resize ──────────────────────────────────────────────────────────────────
+function onResize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  if (mode === 'screen') syncScroll();
+}
+
+// ─── XR Session setup ────────────────────────────────────────────────────────
+async function startXRSession() {
+  if (!navigator.xr) {
+    dom.gateNote.textContent = 'WebXR não disponível neste browser.';
+    return false;
+  }
+  try {
+    const supported = await navigator.xr.isSessionSupported('immersive-vr');
+    if (!supported) {
+      dom.gateNote.textContent = 'immersive-vr não suportado aqui.';
+      return false;
     }
 
-    function routeX(z, offset = 0) {
-      return Math.sin(z * .019 + offset) * 58 + Math.sin(z * .0065 + offset * 2.2) * 42 + Math.cos(z * .044 + offset) * 10;
-    }
-
-    function terrainHeight(x, z) {
-      const road = routeX(z);
-      const leftRidge = Math.exp(-Math.pow((x + 96 + Math.sin(z * .017) * 34) / 52, 2)) * 32;
-      const rightRidge = Math.exp(-Math.pow((x - 94 + Math.cos(z * .014) * 30) / 58, 2)) * 29;
-      const farRidge = Math.exp(-Math.pow((x + Math.sin(z * .012) * 120) / 132, 2)) * 12;
-      const roadValley = -Math.exp(-Math.pow((x - road) / 30, 2)) * 8.5;
-      const waves = Math.sin(x * .052 + z * .017) * 4.1 + Math.cos(x * .022 - z * .029) * 4.5;
-      const longSlope = Math.sin(z * .005) * 6;
-      return leftRidge + rightRidge + farRidge + roadValley + waves + longSlope - 12;
-    }
-
-    class RoadCurve extends THREE.Curve {
-      getPoint(t, target = new THREE.Vector3()) {
-        const z = lerp(PATH_START, PATH_END, t);
-        const x = routeX(z);
-        const y = terrainHeight(x, z) + 1.8;
-        return target.set(x, y, z);
-      }
-    }
-
-    class OffsetRoadCurve extends THREE.Curve {
-      constructor(offset) { super(); this.offset = offset; }
-      getPoint(t, target = new THREE.Vector3()) {
-        const z = lerp(PATH_START, PATH_END, t);
-        const x = routeX(z);
-        const dx = routeX(z + 4) - routeX(z - 4);
-        const side = new THREE.Vector3(1, 0, -dx / 8).normalize();
-        const ox = side.x * this.offset;
-        const oz = side.z * this.offset;
-        return target.set(x + ox, terrainHeight(x + ox, z + oz) + 2, z + oz);
-      }
-    }
-
-    const roadCurve = new RoadCurve();
-
-    function makeSky() {
-      const count = 1300;
-      const positions = new Float32Array(count * 3);
-      const colors = new Float32Array(count * 3);
-      for (let i = 0; i < count; i++) {
-        const radius = 420 + Math.random() * 680;
-        const theta = Math.random() * Math.PI * 2;
-        positions[i * 3] = Math.cos(theta) * radius;
-        positions[i * 3 + 1] = 80 + Math.random() * 430;
-        positions[i * 3 + 2] = PATH_START - 200 + Math.random() * (PATH_END - PATH_START + 520);
-        const b = .55 + Math.random() * .45;
-        colors[i * 3] = .22 * b;
-        colors[i * 3 + 1] = .72 * b;
-        colors[i * 3 + 2] = 1;
-      }
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      const material = new THREE.PointsMaterial({ size: 1.8, vertexColors: true, transparent: true, opacity: .64, blending: THREE.AdditiveBlending, depthWrite: false });
-      objects.stars = new THREE.Points(geometry, material);
-      objects.stars.name = 'sky-starfield';
-      scene.add(objects.stars);
-    }
-
-    function makeTerrain() {
-      const xMin = -210, xMax = 210, zMin = PATH_START - 90, zMax = PATH_END + 120;
-      const xSeg = 96, zSeg = 300;
-      const positions = [], colors = [], indices = [];
-
-      for (let zi = 0; zi <= zSeg; zi++) {
-        const z = lerp(zMin, zMax, zi / zSeg);
-        for (let xi = 0; xi <= xSeg; xi++) {
-          const x = lerp(xMin, xMax, xi / xSeg);
-          const y = terrainHeight(x, z);
-          positions.push(x, y, z);
-          const glow = clamp(1 - Math.abs(x - routeX(z)) / 120);
-          colors.push(0.02 + glow * .04, 0.17 + glow * .18, 0.34 + glow * .55);
-        }
-      }
-
-      for (let zi = 0; zi < zSeg; zi++) {
-        for (let xi = 0; xi < xSeg; xi++) {
-          const a = zi * (xSeg + 1) + xi;
-          indices.push(a, a + xSeg + 1, a + 1, a + 1, a + xSeg + 1, a + xSeg + 2);
-        }
-      }
-
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-      geometry.setIndex(indices);
-      geometry.computeVertexNormals();
-
-      const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .78, metalness: .08, emissive: 0x03172b, emissiveIntensity: .42, transparent: true, opacity: .9 }));
-      mesh.name = 'terrain-mesh';
-      scene.add(mesh);
-
-      const wire = new THREE.LineSegments(new THREE.WireframeGeometry(geometry), new THREE.LineBasicMaterial({ color: 0x14b9ff, transparent: true, opacity: .12, blending: THREE.AdditiveBlending }));
-      wire.name = 'terrain-wire';
-      scene.add(wire);
-    }
-
-    function makeRoad() {
-      const glowMat = new THREE.MeshBasicMaterial({ color: 0x14b9ff, transparent: true, opacity: .18, blending: THREE.AdditiveBlending, depthWrite: false });
-      const lineMat = new THREE.MeshBasicMaterial({ color: 0xd5e0ff, transparent: true, opacity: .98, blending: THREE.AdditiveBlending, depthWrite: false });
-      const haloMat = new THREE.MeshBasicMaterial({ color: 0x0a72ff, transparent: true, opacity: .075, blending: THREE.AdditiveBlending, depthWrite: false });
-
-      [-9.2, -5.4, -2.7, 0, 2.7, 5.4, 9.2].forEach((offset, index) => {
-        const curve = new OffsetRoadCurve(offset);
-        const center = index === 3;
-        const glow = new THREE.Mesh(new THREE.TubeGeometry(curve, 720, center ? 4.2 : 2.2, 12, false), glowMat.clone());
-        glow.material.opacity = center ? .32 : .15;
-        glow.name = `road-glow-${index}`;
-        scene.add(glow);
-
-        const line = new THREE.Mesh(new THREE.TubeGeometry(curve, 720, center ? .86 : .38, 8, false), lineMat.clone());
-        line.material.opacity = center ? 1 : .68;
-        line.name = center ? 'road-line-center' : `road-line-${index}`;
-        scene.add(line);
-
-        if (center) {
-          const halo = new THREE.Mesh(new THREE.TubeGeometry(curve, 720, 9.5, 14, false), haloMat.clone());
-          halo.name = 'road-volumetric-halo';
-          scene.add(halo);
-        }
-      });
-    }
-
-    function makeAuroras() {
-      const mats = [
-        new THREE.MeshBasicMaterial({ color: 0x14b9ff, transparent: true, opacity: .1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
-        new THREE.MeshBasicMaterial({ color: 0x6f7dff, transparent: true, opacity: .075, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
-      ];
-      for (let r = 0; r < 4; r++) {
-        const points = [];
-        const side = r % 2 === 0 ? -1 : 1;
-        for (let i = 0; i <= 84; i++) {
-          const t = i / 84;
-          const z = lerp(PATH_START - 100, PATH_END + 140, t);
-          points.push(new THREE.Vector3(routeX(z) + side * (120 + r * 34 + Math.sin(t * Math.PI * 5 + r) * 18), 54 + Math.sin(t * Math.PI * 4 + r) * 18 + r * 8, z));
-        }
-        const mesh = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 360, 2.2 + r * .35, 8, false), mats[r % 2].clone());
-        mesh.name = `aurora-ribbon-${r}`;
-        objects.auroras.push(mesh);
-        scene.add(mesh);
-      }
-    }
-
-    function makeGates() {
-      const mat = new THREE.MeshBasicMaterial({ color: 0x14b9ff, transparent: true, opacity: .22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-      for (let i = 0; i < 18; i++) {
-        const t = .08 + i * .05;
-        roadCurve.getPoint(t, tmp.point);
-        roadCurve.getTangent(t, tmp.tangent).normalize();
-        const gate = new THREE.Mesh(new THREE.TorusGeometry(13 + (i % 3) * 2, .18, 8, 72), mat.clone());
-        gate.position.copy(tmp.point).add(new THREE.Vector3(0, 8 + (i % 2) * 3, 0));
-        gate.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tmp.tangent);
-        gate.name = `energy-gate-${i}`;
-        gate.userData.baseT = t;
-        gate.userData.phase = Math.random() * Math.PI * 2;
-        objects.gates.push(gate);
-        scene.add(gate);
-      }
-    }
-
-    function makeFlowParticles() {
-      const mat = new THREE.MeshBasicMaterial({ color: 0xd5e0ff, transparent: true, opacity: .82, blending: THREE.AdditiveBlending, depthWrite: false });
-      const lanes = [-5.4, -2.7, 0, 2.7, 5.4];
-      for (let i = 0; i < 52; i++) {
-        const orb = new THREE.Mesh(new THREE.SphereGeometry(.9 + Math.random() * .9, 10, 10), mat.clone());
-        orb.name = `flow-orb-${i}`;
-        orb.userData.offset = Math.random();
-        orb.userData.speed = .045 + Math.random() * .035;
-        orb.userData.lane = lanes[i % lanes.length];
-        objects.flow.push(orb);
-        scene.add(orb);
-      }
-    }
-
-    function makeTowers() {
-      const mat = new THREE.MeshStandardMaterial({ color: 0x15c7ff, emissive: 0x0c6eaa, emissiveIntensity: .68, roughness: .42, metalness: .16, transparent: true, opacity: .5 });
-      const glowMat = new THREE.MeshBasicMaterial({ color: 0x6f7dff, transparent: true, opacity: .12, blending: THREE.AdditiveBlending, depthWrite: false });
-      for (let i = 0; i < 48; i++) {
-        const z = PATH_START + 70 + i * 20 + Math.sin(i * 1.6) * 12;
-        const side = i % 2 === 0 ? -1 : 1;
-        const x = routeX(z) + side * (48 + Math.random() * 105);
-        const y = terrainHeight(x, z);
-        const sx = 6 + Math.random() * 16, sy = 12 + Math.random() * 48, sz = 6 + Math.random() * 16;
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat.clone());
-        mesh.position.set(x, y + sy / 2, z);
-        mesh.rotation.y = Math.random() * Math.PI;
-        scene.add(mesh);
-        const glow = new THREE.Mesh(new THREE.BoxGeometry(sx * 1.18, sy * 1.08, sz * 1.18), glowMat.clone());
-        glow.position.copy(mesh.position);
-        glow.rotation.copy(mesh.rotation);
-        scene.add(glow);
-        mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: 0xd5e0ff, transparent: true, opacity: .22, blending: THREE.AdditiveBlending })));
-      }
-    }
-
-    function makeDust() {
-      const count = 900;
-      const positions = new Float32Array(count * 3);
-      for (let i = 0; i < count; i++) {
-        const z = PATH_START - 60 + Math.random() * (PATH_END - PATH_START + 180);
-        const x = (Math.random() - .5) * 430;
-        positions[i * 3] = x;
-        positions[i * 3 + 1] = terrainHeight(x, z) + 5 + Math.random() * 46;
-        positions[i * 3 + 2] = z;
-      }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      const dust = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0x14b9ff, size: 1.25, transparent: true, opacity: .56, blending: THREE.AdditiveBlending, depthWrite: false }));
-      dust.name = 'particles';
-      scene.add(dust);
-    }
-
-    function makeCockpit() {
-      const group = new THREE.Group();
-      group.name = 'pov-cockpit-frame';
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(.78, .006, 8, 96), new THREE.MeshBasicMaterial({ color: 0x14b9ff, transparent: true, opacity: .22, blending: THREE.AdditiveBlending, depthWrite: false }));
-      ring.position.set(0, 0, -1.35);
-      ring.scale.y = .52;
-      group.add(ring);
-      for (let i = 0; i < 8; i++) {
-        const bar = new THREE.Mesh(new THREE.BoxGeometry(.12, .006, .006), new THREE.MeshBasicMaterial({ color: 0xd5e0ff, transparent: true, opacity: .36, blending: THREE.AdditiveBlending, depthWrite: false }));
-        const a = (i / 8) * Math.PI * 2;
-        bar.position.set(Math.cos(a) * .52, Math.sin(a) * .28, -1.34);
-        bar.rotation.z = a;
-        group.add(bar);
-      }
-      camera.add(group);
-    }
-
-    function makeTrail() {
-      const points = [];
-      for (let i = 0; i < 60; i++) points.push(new THREE.Vector3());
-      const line = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(points),
-        new THREE.LineBasicMaterial({ color: 0xd5e0ff, transparent: true, opacity: .55, blending: THREE.AdditiveBlending })
-      );
-      line.name = 'pov-trail';
-      line.frustumCulled = false;
-      scene.add(line);
-      return { line, points };
-    }
-
-    const trail = makeTrail();
-
-    function makeController(index) {
-      const controller = renderer.xr.getController(index);
-      controller.name = `xr-controller-${index}`;
-      controller.userData.handedness = 'unknown';
-      controller.addEventListener('connected', (event) => {
-        controller.userData.inputSource = event.data;
-        controller.userData.handedness = event.data?.handedness || 'unknown';
-      });
-      controller.addEventListener('selectstart', () => {
-        if (controller.userData.handedness === 'right' || controller.userData.handedness === 'unknown') rightTriggerFallback = true;
-      });
-      controller.addEventListener('selectend', () => {
-        if (controller.userData.handedness === 'right' || controller.userData.handedness === 'unknown') rightTriggerFallback = false;
-      });
-      playerRig.add(controller);
-      controllers.push(controller);
-    }
-
-    makeController(0);
-    makeController(1);
-
-    function getRightTriggerValue() {
-      const session = renderer.xr.getSession();
-      if (!session) return keyboardThrottle ? 1 : 0;
-      let value = rightTriggerFallback ? 1 : 0;
-      for (const source of session.inputSources) {
-        if (source.handedness !== 'right' || !source.gamepad) continue;
-        for (const button of source.gamepad.buttons) value = Math.max(value, button?.value || 0);
-      }
-      return clamp(value);
-    }
-
-    function updateScrollProgress() {
-      const max = document.documentElement.scrollHeight - window.innerHeight;
-      targetProgress = max > 0 ? clamp(window.scrollY / max) : 0;
-    }
-
-    function updateInputProgress(delta) {
-      if (selectedMode === 'vr') {
-        const trigger = getRightTriggerValue();
-        targetProgress = clamp(targetProgress + delta * MOVE_SPEED * trigger);
-        return trigger;
-      }
-      updateScrollProgress();
-      if (keyboardThrottle) targetProgress = clamp(targetProgress + delta * MOVE_SPEED);
-      return keyboardThrottle ? 1 : 0;
-    }
-
-    function updatePOV(triggerValue = 0) {
-      const travel = easeInOut(smoothProgress);
-      const pathT = clamp(travel * .965 + .018);
-      roadCurve.getPoint(pathT, tmp.point);
-      roadCurve.getTangent(pathT, tmp.tangent).normalize();
-      tmp.flatTangent.set(tmp.tangent.x, 0, tmp.tangent.z).normalize();
-      tmp.side.crossVectors(tmp.up, tmp.flatTangent).normalize();
-      tmp.quat.setFromUnitVectors(tmp.forward, tmp.flatTangent);
-
-      const drop = easeInOut(clamp((smoothProgress - .02) / .25));
-      const altitude = lerp(112, 3.2, drop);
-      playerRig.position.lerp(new THREE.Vector3(tmp.point.x, tmp.point.y + altitude, tmp.point.z), selectedMode === 'vr' ? .24 : .12);
-      playerRig.quaternion.slerp(tmp.quat, selectedMode === 'vr' ? .24 : .14);
-
-      camera.position.set(0, 1.62, 0);
-      if (selectedMode === 'screen') camera.rotation.x = THREE.MathUtils.degToRad(-4);
-      else camera.rotation.set(0, 0, 0);
-
-      povLight.position.copy(playerRig.position).add(new THREE.Vector3(0, 6, 0));
-      rimLight.position.copy(playerRig.position).add(tmp.side.clone().multiplyScalar(42)).add(new THREE.Vector3(0, 28, -18));
-
-      for (let i = 0; i < trail.points.length; i++) {
-        const t = clamp(pathT - i * .0016);
-        roadCurve.getPoint(t, trail.points[i]);
-        trail.points[i].y += 2.2;
-      }
-      trail.line.geometry.setFromPoints(trail.points);
-      trail.line.material.opacity = lerp(.14, .72, triggerValue);
-
-      dom.hudAltitude.textContent = `altitude ${Math.round(playerRig.position.y).toString().padStart(3, '0')}`;
-      dom.hudSpeed.textContent = `trigger ${Math.round(triggerValue * 100).toString().padStart(3, '0')}`;
-      dom.hudSignal.textContent = selectedMode === 'vr' ? 'quest right trigger' : 'screen scroll / space';
-      dom.fill.style.width = `${(smoothProgress * 100).toFixed(1)}%`;
-      dom.percent.textContent = `${Math.round(smoothProgress * 100)}%`;
-
-      return pathT;
-    }
-
-    function updateWorld(elapsed, pathT, triggerValue) {
-      if (objects.stars) {
-        objects.stars.rotation.y = elapsed * .008;
-        objects.stars.material.opacity = lerp(.64, .38, smoothProgress);
-      }
-
-      objects.auroras.forEach((ribbon, i) => {
-        ribbon.position.y = Math.sin(elapsed * .38 + i) * 2.2;
-        ribbon.material.opacity = .06 + Math.sin(elapsed * .7 + i) * .018;
-      });
-
-      objects.gates.forEach((gate) => {
-        const d = Math.abs(gate.userData.baseT - pathT);
-        const proximity = clamp(1 - d / .06);
-        gate.material.opacity = .055 + proximity * .52;
-        gate.scale.setScalar(1 + proximity * .32 + Math.sin(elapsed * 2.8 + gate.userData.phase) * .025);
-        gate.rotation.z += .006 + proximity * .018;
-      });
-
-      objects.flow.forEach((orb, i) => {
-        const flowT = (pathT + orb.userData.offset * .08 + elapsed * orb.userData.speed + triggerValue * .01) % 1;
-        const z = lerp(PATH_START, PATH_END, flowT);
-        const x = routeX(z);
-        const dx = routeX(z + 4) - routeX(z - 4);
-        const side = new THREE.Vector3(1, 0, -dx / 8).normalize();
-        orb.position.set(x + side.x * orb.userData.lane, terrainHeight(x, z) + 3.2 + Math.sin(elapsed * 4 + i) * .5, z + side.z * orb.userData.lane);
-        orb.material.opacity = .12 + clamp(1 - Math.abs(flowT - pathT) / .12) * .78;
-        orb.scale.setScalar(.8 + Math.sin(elapsed * 5 + i) * .18);
-      });
-    }
-
-    function renderLoop() {
-      if (!appStarted) return;
-      const delta = Math.min(clock.getDelta(), .05);
-      const elapsed = clock.elapsedTime;
-      const trigger = updateInputProgress(delta);
-      smoothProgress += (targetProgress - smoothProgress) * (selectedMode === 'vr' ? .18 : .06);
-      const pathT = updatePOV(trigger);
-      updateWorld(elapsed, pathT, trigger);
-      renderer.render(scene, camera);
-    }
-
-    function resize() {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setSize(width, height);
-      updateScrollProgress();
-    }
-
-    function tests() {
-      console.groupCollapsed('[Quest POV Demo] sanity tests');
-      console.assert(typeof THREE.Scene === 'function', 'THREE importado');
-      console.assert(renderer.xr.enabled === true, 'WebXR habilitado');
-      console.assert(scene.getObjectByName('player-pov-rig'), 'rig POV existe');
-      console.assert(scene.getObjectByName('pov-camera'), 'câmera POV existe');
-      console.assert(scene.getObjectByName('terrain-mesh'), 'terreno existe');
-      console.assert(scene.getObjectByName('road-line-center'), 'linha central existe');
-      console.assert(scene.getObjectByName('sky-starfield'), 'estrelas existem');
-      console.assert(scene.getObjectByName('aurora-ribbon-0'), 'auroras existem');
-      console.assert(scene.getObjectByName('energy-gate-0'), 'gates existem');
-      console.assert(scene.getObjectByName('flow-orb-0'), 'flow existe');
-      console.assert(controllers.length === 2, 'controllers configurados');
-      console.groupEnd();
-    }
-
-    async function requestXR() {
-      if (!navigator.xr) {
-        dom.gateNote.textContent = 'WebXR não disponível. Abrindo em modo tela.';
-        return false;
-      }
-      try {
-        if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
-        const supported = await navigator.xr.isSessionSupported('immersive-vr');
-        if (!supported) return false;
-        const session = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor'] });
-        await renderer.xr.setSession(session);
-        session.addEventListener('end', () => {
-          selectedMode = 'screen';
-          document.body.classList.remove('is-xr');
-          updateScrollProgress();
-        });
-        return true;
-      } catch (error) {
-        console.warn('[XR fallback]', error);
-        dom.gateNote.textContent = 'Não foi possível entrar em 360°. Abrindo em modo tela.';
-        return false;
-      }
-    }
-
-    async function boot(mode, xrPromise = null) {
-      selectedMode = mode;
-      dom.modeGate.classList.add('is-hidden');
-      dom.loader.classList.remove('is-hidden');
-      dom.loader.classList.add('is-active');
-      document.body.classList.toggle('is-xr', selectedMode === 'vr');
-
-      setLoadProgress(10, 'preparing', 'inicializando renderer');
-      resize();
-
-      setLoadProgress(22, 'building sky', 'criando atmosfera');
-      makeSky();
-
-      setLoadProgress(36, 'building terrain', 'criando terreno e relevo');
-      makeTerrain();
-
-      setLoadProgress(52, 'building route', 'criando estrada luminosa');
-      makeRoad();
-      makeAuroras();
-      makeGates();
-      makeFlowParticles();
-
-      setLoadProgress(72, 'building world', 'criando torres, poeira e cockpit');
-      makeTowers();
-      makeDust();
-      makeCockpit();
-
-      setLoadProgress(88, 'mode setup', selectedMode === 'vr' ? 'aguardando sessão 360°' : 'preparando modo tela');
-      if (xrPromise) {
-        const ok = await xrPromise;
-        if (!ok) {
-          selectedMode = 'screen';
-          document.body.classList.remove('is-xr');
-        }
-      }
-
-      setLoadProgress(97, 'finalizing', 'sincronizando ponto de vista');
-      updateScrollProgress();
-      updatePOV(0);
-      renderer.render(scene, camera);
-      tests();
-
-      setLoadProgress(100, 'ready', selectedMode === 'vr' ? 'segure o gatilho direito' : 'scroll, espaço ou W para avançar');
-      window.setTimeout(() => {
-        document.body.classList.add('is-ready');
-        dom.loader.classList.add('is-hidden');
-        dom.loader.classList.remove('is-active');
-        appStarted = true;
-        clock.start();
-        renderer.setAnimationLoop(renderLoop);
-      }, 450);
-    }
-
-    dom.enterVrBtn.addEventListener('click', () => {
-      const xrPromise = requestXR();
-      boot('vr', xrPromise);
+    // Request immersive-vr with local-floor (height tracking on Quest)
+    xrSession = await navigator.xr.requestSession('immersive-vr', {
+      requiredFeatures: ['local-floor'],
+      optionalFeatures: ['bounded-floor', 'hand-tracking'],
     });
 
-    dom.screenBtn.addEventListener('click', () => boot('screen'));
+    // Wire Three.js XR manager to the session
+    await renderer.xr.setSession(xrSession);
 
-    window.addEventListener('resize', resize);
-    window.addEventListener('scroll', updateScrollProgress, { passive: true });
-    window.addEventListener('wheel', updateScrollProgress, { passive: true });
-    window.addEventListener('touchmove', updateScrollProgress, { passive: true });
-    window.addEventListener('keydown', (event) => {
-      if (['Space', 'ArrowUp', 'KeyW'].includes(event.code)) keyboardThrottle = true;
+    /**
+     * Get the reference space. 'local-floor' anchors origin at floor level,
+     * so the user's eyes are naturally at their correct height — no need to
+     * manually set camera Y.
+     */
+    xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
+
+    xrSession.addEventListener('end', () => {
+      xrSession  = null;
+      xrRefSpace = null;
+      mode       = 'screen';
+      document.body.classList.remove('vr-mode');
+      document.body.classList.add('scroll-mode');
+      syncScroll();
     });
-    window.addEventListener('keyup', (event) => {
-      if (['Space', 'ArrowUp', 'KeyW'].includes(event.code)) keyboardThrottle = false;
-    });
-  </script>
+
+    return true;
+  } catch (err) {
+    console.warn('[XR]', err);
+    dom.gateNote.textContent = 'Não foi possível iniciar sessão VR: ' + err.message;
+    return false;
+  }
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+async function boot(requestedMode) {
+  mode = requestedMode;
+
+  // Hide gate, show loader
+  dom.gate.classList.add('hidden');
+  dom.loader.classList.add('active');
+  loadPct = 0;
+
+  setLoad(10, 'preparando', 'iniciando renderer');
+  onResize();
+
+  setLoad(20, 'céu', 'criando estrelas');   buildSky();
+  setLoad(35, 'terreno', 'relevo e malha'); buildTerrain();
+  setLoad(52, 'rota', 'estrada luminosa');  buildRoad(); buildAuroras(); buildGates(); buildFlow();
+  setLoad(70, 'mundo', 'torres e poeira');  buildTowers(); buildDust(); buildCockpit();
+
+  setLoad(82, 'modo', mode === 'vr' ? 'iniciando sessão XR' : 'preparando tela');
+
+  if (mode === 'vr') {
+    const ok = await startXRSession();
+    if (!ok) {
+      // Fallback to screen
+      mode = 'screen';
+    }
+  }
+
+  if (mode === 'vr') {
+    document.body.classList.add('vr-mode');
+    document.body.classList.remove('scroll-mode');
+    dom.hintText.textContent = 'Gatilho direito ou thumbstick para avançar';
+  } else {
+    document.body.classList.add('scroll-mode');
+    document.body.classList.remove('vr-mode');
+    syncScroll();
+  }
+
+  setLoad(96, 'finalizando', 'sincronizando');
+  updatePOV(0);
+  renderer.render(scene, camera);
+
+  setLoad(100, 'pronto', mode === 'vr' ? 'pressione o gatilho direito' : 'scroll ou espaço para avançar');
+
+  setTimeout(() => {
+    document.body.classList.add('is-ready');
+    dom.loader.classList.remove('active');
+    appStarted = true;
+    clock.start();
+
+    /**
+     * CRITICAL: Use renderer.setAnimationLoop instead of requestAnimationFrame.
+     * This is required for WebXR — the XR session drives its own loop and Three.js
+     * hooks into it via setAnimationLoop. The callback receives (timestamp, XRFrame)
+     * automatically when in VR mode.
+     */
+    renderer.setAnimationLoop(renderLoop);
+  }, 450);
+}
+
+// ─── Event listeners ─────────────────────────────────────────────────────────
+dom.enterVrBtn.addEventListener('click', () => boot('vr'));
+dom.screenBtn.addEventListener('click',  () => boot('screen'));
+
+window.addEventListener('resize', onResize);
+window.addEventListener('scroll', syncScroll, {passive:true});
+window.addEventListener('wheel',  syncScroll, {passive:true});
+window.addEventListener('touchmove', syncScroll, {passive:true});
+window.addEventListener('keydown', e => { if (['Space','ArrowUp','KeyW'].includes(e.code)) keyDown=true; });
+window.addEventListener('keyup',   e => { if (['Space','ArrowUp','KeyW'].includes(e.code)) keyDown=false; });
+
+// ─── Sanity checks ───────────────────────────────────────────────────────────
+console.groupCollapsed('[HUBTOWN] Sanity checks');
+console.assert(renderer.xr.enabled,          'WebXR habilitado no renderer');
+console.assert(typeof RoadCurve === 'function','RoadCurve ok');
+console.groupEnd();
+</script>
 </body>
 </html>
