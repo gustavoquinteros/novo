@@ -34,7 +34,6 @@
     }
 
     /* scroll height only in screen mode */
-    body.scroll-mode { height: 1200vh; }
     body.vr-mode     { height: 100vh; overflow: hidden; }
 
     canvas {
@@ -315,6 +314,7 @@
 <div class="hud">
   <span id="hudAlt">altitude 000</span>
   <span id="hudSpd">gatilho 000</span>
+  <span id="hudShots">tiros 000</span>
   <span id="hudMode">modo carregando</span>
 </div>
 
@@ -358,12 +358,25 @@ let xrRefSpace    = null;
 let targetProgress  = 0;
 let smoothProgress  = 0;
 let loadPct       = 0;
-let keyDown       = false; // keyboard throttle
+
+let yawOffset = 0;   // accumulated yaw rotation from right thumbstick X
+
+const projectiles = [];            // active projectile objects
+let lastShotTime  = -Infinity;     // timestamp of last shot (ms)
+const SHOT_COOLDOWN = 200;         // minimum ms between shots
+const PROJECTILE_SPEED  = 18;     // units per second
+const PROJECTILE_LIFE   = 2500;   // milliseconds before auto-removal
 
 // ─── Three.js core ───────────────────────────────────────────────────────────
 const clock  = new THREE.Clock();
 const scene  = new THREE.Scene();
 scene.fog    = new THREE.FogExp2(0x020817, 0.0025);
+
+let rightGripPose = null;          // XRPose updated every frame
+const handGroup = new THREE.Group();
+handGroup.name = 'right-hand-group';
+handGroup.visible = false;
+scene.add(handGroup);              // added directly to scene, NOT to playerRig
 
 /**
  * Player rig: holds the camera.
@@ -604,6 +617,127 @@ function buildCockpit() {
   camera.add(grp);
 }
 
+function buildArquinha() {
+  // Body of the weapon — a small rectangular box
+  const bodyGeo = new THREE.BoxGeometry(0.08, 0.06, 0.14);
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: 0x14b9ff,
+    emissive: 0x0a4466,
+    emissiveIntensity: 0.9,
+    roughness: 0.3,
+    metalness: 0.7,
+    transparent: true,
+    opacity: 0.92,
+  });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.name = 'arquinha-body';
+
+  // Wireframe edge overlay for the sci-fi look
+  const edgesGeo = new THREE.EdgesGeometry(bodyGeo);
+  const edgesMat = new THREE.LineBasicMaterial({
+    color: 0xd5e0ff,
+    transparent: true,
+    opacity: 0.9,
+    blending: THREE.AdditiveBlending,
+  });
+  const edges = new THREE.LineSegments(edgesGeo, edgesMat);
+  edges.name = 'arquinha-edges';
+
+  // Muzzle glow — small point light at the front tip of the weapon
+  // Front of weapon = +Z in local space (box extends 0.07 along Z from center)
+  const muzzleGlow = new THREE.PointLight(0x14b9ff, 0, 0.3, 2.0);
+  muzzleGlow.position.set(0, 0, 0.07);
+  muzzleGlow.name = 'muzzle-glow';
+
+  // Muzzle visual indicator — tiny sphere at front
+  const muzzleDot = new THREE.Mesh(
+    new THREE.SphereGeometry(0.008, 8, 8),
+    new THREE.MeshBasicMaterial({
+      color: 0x14b9ff,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+  muzzleDot.position.set(0, 0, 0.07);
+  muzzleDot.name = 'muzzle-dot';
+
+  handGroup.add(body, edges, muzzleGlow, muzzleDot);
+
+  // Store ref to muzzleGlow for shooting flash effect
+  mesh.muzzleGlow = muzzleGlow;
+}
+
+function spawnProjectile() {
+  if (!handGroup.visible) return;   // only shoot if hand is tracked
+
+  const now = performance.now();
+  if (now - lastShotTime < SHOT_COOLDOWN) return;
+  lastShotTime = now;
+
+  // The weapon's forward direction is -Z in its local space.
+  // Transform to world space using the handGroup world quaternion.
+  const forward = new THREE.Vector3(0, 0, -1);
+  forward.applyQuaternion(handGroup.getWorldQuaternion(new THREE.Quaternion()));
+
+  // Spawn position = muzzle tip in world space
+  const spawnPos = new THREE.Vector3();
+  handGroup.getWorldPosition(spawnPos);
+  spawnPos.addScaledVector(forward, 0.12); // offset slightly ahead of muzzle
+
+  const geo = new THREE.SphereGeometry(0.04, 8, 8);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xd5e0ff,
+    transparent: true,
+    opacity: 0.95,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const pMesh = new THREE.Mesh(geo, mat);
+  pMesh.position.copy(spawnPos);
+  pMesh.name = 'projectile';
+
+  // Trail light on each projectile
+  const pLight = new THREE.PointLight(0xd5e0ff, 4, 1.2, 2.2);
+  pMesh.add(pLight);
+
+  scene.add(pMesh);
+
+  projectiles.push({
+    mesh:     pMesh,
+    velocity: forward.multiplyScalar(PROJECTILE_SPEED),
+    bornAt:   now,
+  });
+
+  // Muzzle flash — brief spike on the muzzle glow light
+  if (mesh.muzzleGlow) {
+    mesh.muzzleGlow.intensity = 8;
+    setTimeout(() => { if (mesh.muzzleGlow) mesh.muzzleGlow.intensity = 0; }, 80);
+  }
+}
+
+function updateProjectiles(delta) {
+  const now = performance.now();
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+
+    // Advance position
+    p.mesh.position.addScaledVector(p.velocity, delta);
+
+    // Fade out in last 500ms of life
+    const age      = now - p.bornAt;
+    const lifeRatio = age / PROJECTILE_LIFE;
+    p.mesh.material.opacity = 0.95 * (1 - Math.max(0, (lifeRatio - 0.8) / 0.2));
+
+    // Remove if expired
+    if (age > PROJECTILE_LIFE) {
+      scene.remove(p.mesh);
+      p.mesh.geometry.dispose();
+      p.mesh.material.dispose();
+      projectiles.splice(i, 1);
+    }
+  }
+}
+
 // Trail
 const trailPts = Array.from({length:60},()=>new THREE.Vector3());
 const trailLine = new THREE.Line(
@@ -612,56 +746,6 @@ const trailLine = new THREE.Line(
 );
 trailLine.frustumCulled = false;
 scene.add(trailLine);
-
-// ─── INPUT: xr-standard mapping (Meta Quest) ─────────────────────────────────
-/**
- * xr-standard button layout (Meta Quest 2/3/Pro):
- *   buttons[0] = trigger (index finger) — ANALOG value 0–1
- *   buttons[1] = grip (middle finger)
- *   buttons[2] = N/A (touchpad, unused on Quest)
- *   buttons[3] = thumbstick click
- *   buttons[4] = A / X  (right / left)
- *   buttons[5] = B / Y  (right / left)
- *   axes[0,1]  = touchpad (unused)
- *   axes[2,3]  = thumbstick X,Y
- */
-function getRightTrigger() {
-  // VR mode: read from live XR input sources (correct way)
-  if (mode === 'vr' && xrSession) {
-    for (const src of xrSession.inputSources) {
-      if (src.handedness !== 'right') continue;
-      const gp = src.gamepad;
-      if (!gp) continue;
-      // Trigger = buttons[0], grip = buttons[1]
-      // Accept analog trigger OR full grip as "move"
-      const trigger = gp.buttons[0]?.value ?? 0;
-      const grip    = gp.buttons[1]?.value ?? 0;
-      return Math.max(trigger, grip);
-    }
-    return 0;
-  }
-  // Screen mode: keyboard
-  return keyDown ? 1 : 0;
-}
-
-function getRightThumbstick() {
-  // axes[2] = horizontal, axes[3] = vertical (forward = negative Y on Quest)
-  if (mode === 'vr' && xrSession) {
-    for (const src of xrSession.inputSources) {
-      if (src.handedness !== 'right') continue;
-      const gp = src.gamepad;
-      if (!gp || !gp.axes) continue;
-      return { x: gp.axes[2] ?? 0, y: gp.axes[3] ?? 0 };
-    }
-  }
-  return { x: 0, y: 0 };
-}
-
-// ─── Scroll (screen mode) ─────────────────────────────────────────────────────
-function syncScroll() {
-  const max = document.documentElement.scrollHeight - innerHeight;
-  targetProgress = max > 0 ? clamp(scrollY / max) : 0;
-}
 
 // ─── POV update ──────────────────────────────────────────────────────────────
 const _pt  = new THREE.Vector3();
@@ -672,7 +756,7 @@ const _fwd = new THREE.Vector3(0,0,-1);
 const _up  = new THREE.Vector3(0,1,0);
 const _side= new THREE.Vector3();
 
-function updatePOV(triggerVal) {
+function updatePOV(sY) {
   const t    = eio(smoothProgress);
   const pathT= clamp(t * .965 + .018);
 
@@ -697,8 +781,16 @@ function updatePOV(triggerVal) {
    *                  pose directly to the camera every frame. If we overwrite it
    *                  we break head-tracking sync completely.
    */
-  if (mode === 'screen') {
-    playerRig.quaternion.slerp(_q, .14);
+  // Apply yaw offset on top of route orientation
+  // Create a quaternion for the yaw delta and multiply into playerRig
+  const yawQ = new THREE.Quaternion();
+  yawQ.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawOffset);
+  // In VR: playerRig.quaternion = yawQ (pure yaw, headset handles the rest)
+  // In screen: playerRig.quaternion = _q * yawQ (route direction + yaw)
+  if (mode === 'vr') {
+    playerRig.quaternion.copy(yawQ);
+  } else {
+    playerRig.quaternion.copy(_q).multiply(yawQ);
     camera.position.set(0, 1.62, 0);
     camera.rotation.x = THREE.MathUtils.degToRad(-4);
   }
@@ -717,11 +809,11 @@ function updatePOV(triggerVal) {
     trailPts[i].y += 2.2;
   }
   trailLine.geometry.setFromPoints(trailPts);
-  trailLine.material.opacity = lerp(.14, .72, triggerVal);
+  trailLine.material.opacity = lerp(.14, .72, Math.abs(sY));
 
   // HUD
   dom.hudAlt.textContent  = `altitude ${Math.round(playerRig.position.y).toString().padStart(3,'0')}`;
-  dom.hudSpd.textContent  = `gatilho  ${Math.round(triggerVal * 100).toString().padStart(3,'0')}`;
+  dom.hudSpd.textContent  = `stick ${Math.round(Math.abs(sY) * 100).toString().padStart(3,'0')}`;
   dom.hudMode.textContent = mode === 'vr' ? 'meta quest · gatilho' : 'tela · scroll/espaço';
   dom.fill.style.width    = (smoothProgress * 100).toFixed(1) + '%';
   dom.pct.textContent     = Math.round(smoothProgress * 100) + '%';
@@ -764,26 +856,89 @@ function renderLoop(timestamp, xrFrame) {
   const delta   = Math.min(clock.getDelta(), .05);
   const elapsed = clock.elapsedTime;
 
-  // Progress advance
-  if (mode === 'vr') {
-    const trigger    = getRightTrigger();
-    const stick      = getRightThumbstick();
-    // Thumbstick forward (negative Y = push forward on Quest)
-    const stickFwd   = clamp(-stick.y, 0, 1);
-    const input      = Math.max(trigger, stickFwd);
-    targetProgress   = clamp(targetProgress + delta * MOVE_SPEED * input);
-    smoothProgress  += (targetProgress - smoothProgress) * .18;
-    updatePOV(input);
-    updateWorld(elapsed, clamp(eio(smoothProgress) * .965 + .018), input);
-  } else {
-    // Screen: driven by scroll + keyboard
-    syncScroll();
-    if (keyDown) targetProgress = clamp(targetProgress + delta * MOVE_SPEED);
-    const kv = keyDown ? 1 : 0;
-    smoothProgress += (targetProgress - smoothProgress) * .06;
-    updatePOV(kv);
-    updateWorld(elapsed, clamp(eio(smoothProgress) * .965 + .018), kv);
+  // Update right hand grip pose from XRFrame
+  // xrFrame is passed as second argument to the renderLoop by renderer.xr
+  rightGripPose = null;
+  handGroup.visible = false;
+
+  if (mode === 'vr' && xrSession && xrFrame) {
+    for (const src of xrSession.inputSources) {
+      if (src.handedness !== 'right' || !src.gripSpace) continue;
+      try {
+        const pose = xrFrame.getPose(src.gripSpace, xrRefSpace);
+        if (pose) {
+          rightGripPose = pose;
+          // Decompose the 4x4 column-major matrix from WebXR into Three.js objects
+          const m = new THREE.Matrix4();
+          m.fromArray(pose.transform.matrix);
+          // Extract position and quaternion from the matrix
+          const pos = new THREE.Vector3();
+          const quat = new THREE.Quaternion();
+          const scale = new THREE.Vector3();
+          m.decompose(pos, quat, scale);
+          handGroup.position.copy(pos);
+          handGroup.quaternion.copy(quat);
+          handGroup.visible = true;
+        }
+      } catch(e) { /* gripSpace may not be available every frame */ }
+      break;
+    }
   }
+
+  // Detect right index trigger press (buttons[0]) for shooting
+  if (mode === 'vr' && xrSession) {
+    for (const src of xrSession.inputSources) {
+      if (src.handedness !== 'right') continue;
+      const gp = src.gamepad;
+      if (!gp || !gp.buttons || !gp.buttons[0]) continue;
+      // Use .pressed (boolean) not .value for shot trigger
+      // to ensure single-shot per press, combined with cooldown
+      if (gp.buttons[0].pressed) {
+        spawnProjectile();
+      }
+      break;
+    }
+  }
+
+  // Read right thumbstick from xr-standard mapping
+  // axes[2] = thumbstick X (horizontal), axes[3] = thumbstick Y (vertical)
+  // On Meta Quest: pushing thumbstick FORWARD = axes[3] negative value
+  // pushing thumbstick BACK = axes[3] positive value
+
+  let stickX = 0;  // horizontal — used for yaw offset
+  let stickY = 0;  // vertical   — used for route progress
+
+  if (mode === 'vr' && xrSession) {
+    for (const src of xrSession.inputSources) {
+      if (src.handedness !== 'right') continue;
+      const gp = src.gamepad;
+      if (!gp || !gp.axes || gp.axes.length < 4) continue;
+      stickX = gp.axes[2] ?? 0;   // -1 (left) to +1 (right)
+      stickY = gp.axes[3] ?? 0;   // -1 (forward) to +1 (back)
+      break;
+    }
+  }
+
+  // Apply deadzone of 0.12 to both axes to avoid drift
+  const DZ = 0.12;
+  const sX = Math.abs(stickX) > DZ ? stickX : 0;
+  const sY = Math.abs(stickY) > DZ ? stickY : 0;
+
+  // Route progress: forward = negative Y on Quest thumbstick
+  // MOVE_SPEED stays at 0.055 as defined
+  targetProgress = clamp(targetProgress + delta * MOVE_SPEED * -sY);
+  smoothProgress += (targetProgress - smoothProgress) * 0.18;
+
+  // Yaw offset: accumulate horizontal rotation from thumbstick X
+  // Rate: 1.4 radians/second at full deflection
+  yawOffset += sX * delta * 1.4;
+
+  const pathT = updatePOV(sY);
+  updateWorld(elapsed, clamp(eio(smoothProgress) * .965 + .018), Math.abs(sY));
+
+  updateProjectiles(delta);
+  document.getElementById('hudShots').textContent =
+    `tiros ${projectiles.length.toString().padStart(3,'0')}`;
 
   renderer.render(scene, camera);
 }
@@ -794,7 +949,6 @@ function onResize() {
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(innerWidth, innerHeight);
-  if (mode === 'screen') syncScroll();
 }
 
 // ─── XR Session setup ────────────────────────────────────────────────────────
@@ -831,8 +985,6 @@ async function startXRSession() {
       xrRefSpace = null;
       mode       = 'screen';
       document.body.classList.remove('vr-mode');
-      document.body.classList.add('scroll-mode');
-      syncScroll();
     });
 
     return true;
@@ -858,7 +1010,7 @@ async function boot(requestedMode) {
   setLoad(20, 'céu', 'criando estrelas');   buildSky();
   setLoad(35, 'terreno', 'relevo e malha'); buildTerrain();
   setLoad(52, 'rota', 'estrada luminosa');  buildRoad(); buildAuroras(); buildGates(); buildFlow();
-  setLoad(70, 'mundo', 'torres e poeira');  buildTowers(); buildDust(); buildCockpit();
+  setLoad(70, 'mundo', 'torres e poeira');  buildTowers(); buildDust(); buildCockpit(); buildArquinha();
 
   setLoad(82, 'modo', mode === 'vr' ? 'iniciando sessão XR' : 'preparando tela');
 
@@ -872,12 +1024,9 @@ async function boot(requestedMode) {
 
   if (mode === 'vr') {
     document.body.classList.add('vr-mode');
-    document.body.classList.remove('scroll-mode');
     dom.hintText.textContent = 'Gatilho direito ou thumbstick para avançar';
   } else {
-    document.body.classList.add('scroll-mode');
     document.body.classList.remove('vr-mode');
-    syncScroll();
   }
 
   setLoad(96, 'finalizando', 'sincronizando');
@@ -907,11 +1056,6 @@ dom.enterVrBtn.addEventListener('click', () => boot('vr'));
 dom.screenBtn.addEventListener('click',  () => boot('screen'));
 
 window.addEventListener('resize', onResize);
-window.addEventListener('scroll', syncScroll, {passive:true});
-window.addEventListener('wheel',  syncScroll, {passive:true});
-window.addEventListener('touchmove', syncScroll, {passive:true});
-window.addEventListener('keydown', e => { if (['Space','ArrowUp','KeyW'].includes(e.code)) keyDown=true; });
-window.addEventListener('keyup',   e => { if (['Space','ArrowUp','KeyW'].includes(e.code)) keyDown=false; });
 
 // ─── Sanity checks ───────────────────────────────────────────────────────────
 console.groupCollapsed('[HUBTOWN] Sanity checks');
