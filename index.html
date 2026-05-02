@@ -4,318 +4,85 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HUBTOWN — 360° Route POV</title>
-
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-      }
-    }
-  </script>
-
+  <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
   <style>
-    :root {
-      --dark: #020817;
-      --blue: #14b9ff;
-      --soft: #d5e0ff;
-      --violet: #6f7dff;
-      --line: rgba(213,224,255,.14);
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html, body {
-      width: 100%;
-      min-height: 100%;
-      background: var(--dark);
-      color: var(--soft);
-      font-family: 'Courier New', Courier, monospace;
-      overflow-x: hidden;
-    }
-
-    /* scroll height only in screen mode */
-    body.vr-mode     { height: 100vh; overflow: hidden; }
-
-    canvas {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      display: block;
-      opacity: 0;
-      transition: opacity .7s ease;
-      z-index: 0;
-    }
-    body.is-ready canvas { opacity: 1; }
-
-    /* ── GATE ── */
-    .mode-gate {
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      display: grid;
-      place-items: center;
-      background:
-        radial-gradient(circle at 50% 42%, rgba(20,185,255,.18), transparent 34%),
-        radial-gradient(circle at 18% 70%, rgba(111,125,255,.12), transparent 32%),
-        linear-gradient(180deg, #020817, #01040d);
-      transition: opacity .55s ease, visibility .55s ease;
-    }
-    .mode-gate.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-
-    /* ── LOADER ── */
-    .loader {
-      position: fixed;
-      inset: 0;
-      z-index: 99;
-      display: grid;
-      place-items: center;
-      background: linear-gradient(180deg, #020817, #01040d);
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity .4s ease, visibility .4s ease;
-    }
-    .loader.active { opacity: 1; visibility: visible; }
-
-    .panel {
-      width: min(540px, calc(100vw - 44px));
-      text-align: center;
-    }
-
-    .logo {
-      margin-bottom: 26px;
-      font-size: 22px;
-      font-weight: 900;
-      letter-spacing: .44em;
-      text-transform: uppercase;
-      text-shadow: 0 0 28px rgba(20,185,255,.6);
-      color: var(--blue);
-    }
-
-    h1 {
-      margin: 0 0 18px;
-      font-size: clamp(34px, 5vw, 62px);
-      line-height: .92;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--soft);
-    }
-
-    p {
-      width: min(460px, 100%);
-      margin: 0 auto 30px;
-      color: rgba(213,224,255,.66);
-      line-height: 1.65;
-      font-size: 14px;
-    }
-
-    .actions {
-      display: grid;
-      gap: 12px;
-      width: min(430px, 100%);
-      margin: 0 auto;
-    }
-
-    button {
-      appearance: none;
-      border: 1px solid rgba(213,224,255,.22);
-      color: var(--soft);
-      background: rgba(213,224,255,.07);
-      backdrop-filter: blur(16px);
-      padding: 18px 22px;
-      cursor: pointer;
-      font-family: inherit;
-      font-size: 11px;
-      letter-spacing: .2em;
-      text-transform: uppercase;
-      font-weight: 900;
-      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
-      transition: background .2s, box-shadow .2s;
-    }
-    button:hover { background: rgba(213,224,255,.14); }
-    button.primary {
-      color: #020817;
-      background: var(--soft);
-      box-shadow: 0 0 40px rgba(20,185,255,.35);
-    }
-    button.primary:hover { box-shadow: 0 0 60px rgba(20,185,255,.6); }
-
-    .note {
-      margin-top: 16px;
-      min-height: 18px;
-      color: rgba(213,224,255,.42);
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: .16em;
-      text-transform: uppercase;
-    }
-
-    /* loader bar */
-    .loader-label {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 12px;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: .2em;
-      text-transform: uppercase;
-      color: rgba(213,224,255,.62);
-    }
-    .loader-track {
-      height: 6px;
-      background: rgba(213,224,255,.1);
-      border: 1px solid rgba(213,224,255,.14);
-      overflow: hidden;
-    }
-    .loader-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, var(--blue), var(--soft));
-      box-shadow: 0 0 24px rgba(20,185,255,.8);
-      transition: width .25s ease;
-    }
-    .loader-status {
-      margin-top: 12px;
-      color: rgba(213,224,255,.42);
-      font-size: 10px;
-      letter-spacing: .14em;
-      text-transform: uppercase;
-    }
-
-    /* ── HUD (screen mode only) ── */
-    .overlay {
-      position: fixed; inset: 0; z-index: 2;
-      pointer-events: none;
-      opacity: 0; transition: opacity .8s;
-      background:
-        radial-gradient(circle at 50% 46%, transparent 0 38%, rgba(0,0,0,.28) 68%, rgba(0,0,0,.76) 100%),
-        repeating-linear-gradient(0deg, rgba(213,224,255,.04) 0 1px, transparent 1px 5px);
-      mix-blend-mode: screen;
-    }
-    .hud, .progress-box, .title-ui {
-      position: fixed; z-index: 3;
-      pointer-events: none;
-      opacity: 0; transition: opacity .8s;
-    }
-    body.is-ready .overlay,
-    body.is-ready .hud,
-    body.is-ready .progress-box,
-    body.is-ready .title-ui { opacity: 1; }
-    body.vr-mode .overlay,
-    body.vr-mode .hud,
-    body.vr-mode .progress-box,
-    body.vr-mode .title-ui { display: none; }
-
-    .title-ui {
-      left: 50%; bottom: 14vh;
-      width: min(720px, calc(100vw - 48px));
-      transform: translateX(-50%);
-      text-align: center;
-    }
-    .title-ui .eyebrow {
-      margin-bottom: 14px;
-      font-size: 11px; font-weight: 900;
-      letter-spacing: .28em;
-      color: rgba(213,224,255,.55);
-      text-transform: uppercase;
-    }
-    .title-ui h2 {
-      margin: 0;
-      font-size: clamp(32px, 4vw, 58px);
-      line-height: .92;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      text-shadow: 0 0 42px rgba(20,185,255,.42);
-    }
-    .title-ui small {
-      display: block;
-      margin-top: 20px;
-      color: rgba(213,224,255,.5);
-      letter-spacing: .14em;
-      text-transform: uppercase;
-      font-size: 11px;
-    }
-
-    .hud {
-      left: 42px; bottom: 44px;
-      display: grid; gap: 8px;
-      color: rgba(213,224,255,.55);
-      font-size: 10px; font-weight: 900;
-      letter-spacing: .18em;
-      text-transform: uppercase;
-    }
-
-    .progress-box {
-      right: 42px; bottom: 44px;
-      width: 260px; padding: 16px;
-      background: rgba(2,8,23,.6);
-      border: 1px solid rgba(213,224,255,.12);
-      backdrop-filter: blur(20px);
-      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
-    }
-    .progress-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 10px;
-      color: rgba(213,224,255,.58);
-      font-size: 10px; font-weight: 900;
-      letter-spacing: .16em;
-      text-transform: uppercase;
-    }
-    .track { height: 4px; background: rgba(213,224,255,.12); overflow: hidden; }
-    .fill {
-      width: 0%; height: 100%;
-      background: var(--soft);
-      box-shadow: 0 0 16px rgba(20,185,255,.9);
-      transition: width .1s;
-    }
+    :root{--dark:#020817;--blue:#14b9ff;--soft:#d5e0ff;--violet:#6f7dff}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:100%;min-height:100%;background:var(--dark);color:var(--soft);font-family:'Courier New',Courier,monospace;overflow-x:hidden}
+    body.vr-mode{height:100vh;overflow:hidden}
+    canvas{position:fixed;inset:0;width:100vw;height:100vh;display:block;opacity:0;transition:opacity .7s;z-index:0}
+    body.is-ready canvas{opacity:1}
+    .mode-gate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:radial-gradient(circle at 50% 42%,rgba(20,185,255,.18),transparent 34%),radial-gradient(circle at 18% 70%,rgba(111,125,255,.12),transparent 32%),linear-gradient(180deg,#020817,#01040d);transition:opacity .55s,visibility .55s}
+    .mode-gate.hidden{opacity:0;visibility:hidden;pointer-events:none}
+    .loader{position:fixed;inset:0;z-index:99;display:grid;place-items:center;background:linear-gradient(180deg,#020817,#01040d);opacity:0;visibility:hidden;transition:opacity .4s,visibility .4s}
+    .loader.active{opacity:1;visibility:visible}
+    .panel{width:min(540px,calc(100vw - 44px));text-align:center}
+    .logo{margin-bottom:26px;font-size:22px;font-weight:900;letter-spacing:.44em;text-transform:uppercase;text-shadow:0 0 28px rgba(20,185,255,.6);color:var(--blue)}
+    h1{margin:0 0 18px;font-size:clamp(34px,5vw,62px);line-height:.92;letter-spacing:.08em;text-transform:uppercase;color:var(--soft)}
+    p{width:min(460px,100%);margin:0 auto 30px;color:rgba(213,224,255,.66);line-height:1.65;font-size:14px}
+    .actions{display:grid;gap:12px;width:min(430px,100%);margin:0 auto}
+    button{appearance:none;border:1px solid rgba(213,224,255,.22);color:var(--soft);background:rgba(213,224,255,.07);backdrop-filter:blur(16px);padding:18px 22px;cursor:pointer;font-family:inherit;font-size:11px;letter-spacing:.2em;text-transform:uppercase;font-weight:900;clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px));transition:background .2s,box-shadow .2s}
+    button:hover{background:rgba(213,224,255,.14)}
+    button.primary{color:#020817;background:var(--soft);box-shadow:0 0 40px rgba(20,185,255,.35)}
+    button.primary:hover{box-shadow:0 0 60px rgba(20,185,255,.6)}
+    .note{margin-top:16px;min-height:18px;color:rgba(213,224,255,.42);font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+    .loader-label{display:flex;justify-content:space-between;margin-bottom:12px;font-size:10px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:rgba(213,224,255,.62)}
+    .loader-track{height:6px;background:rgba(213,224,255,.1);border:1px solid rgba(213,224,255,.14);overflow:hidden}
+    .loader-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--blue),var(--soft));box-shadow:0 0 24px rgba(20,185,255,.8);transition:width .25s}
+    .loader-status{margin-top:12px;color:rgba(213,224,255,.42);font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+    .overlay{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .8s;background:radial-gradient(circle at 50% 46%,transparent 0 38%,rgba(0,0,0,.28) 68%,rgba(0,0,0,.76) 100%),repeating-linear-gradient(0deg,rgba(213,224,255,.04) 0 1px,transparent 1px 5px);mix-blend-mode:screen}
+    .hud,.progress-box,.title-ui{position:fixed;z-index:3;pointer-events:none;opacity:0;transition:opacity .8s}
+    body.is-ready .overlay,body.is-ready .hud,body.is-ready .progress-box,body.is-ready .title-ui{opacity:1}
+    body.vr-mode .overlay,body.vr-mode .hud,body.vr-mode .progress-box,body.vr-mode .title-ui{display:none}
+    .title-ui{left:50%;bottom:14vh;width:min(720px,calc(100vw - 48px));transform:translateX(-50%);text-align:center}
+    .title-ui .eyebrow{margin-bottom:14px;font-size:11px;font-weight:900;letter-spacing:.28em;color:rgba(213,224,255,.55);text-transform:uppercase}
+    .title-ui h2{margin:0;font-size:clamp(32px,4vw,58px);line-height:.92;letter-spacing:.08em;text-transform:uppercase;text-shadow:0 0 42px rgba(20,185,255,.42)}
+    .title-ui small{display:block;margin-top:20px;color:rgba(213,224,255,.5);letter-spacing:.14em;text-transform:uppercase;font-size:11px}
+    .hud{left:42px;bottom:44px;display:grid;gap:8px;color:rgba(213,224,255,.55);font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}
+    .progress-box{right:42px;bottom:44px;width:260px;padding:16px;background:rgba(2,8,23,.6);border:1px solid rgba(213,224,255,.12);backdrop-filter:blur(20px);clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,0 100%)}
+    .progress-row{display:flex;justify-content:space-between;margin-bottom:10px;color:rgba(213,224,255,.58);font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+    .track{height:4px;background:rgba(213,224,255,.12);overflow:hidden}
+    .fill{width:0%;height:100%;background:var(--soft);box-shadow:0 0 16px rgba(20,185,255,.9);transition:width .1s}
   </style>
 </head>
 <body>
 
-<!-- MODE GATE -->
 <section class="mode-gate" id="modeGate">
   <div class="panel">
     <div class="logo">HUBTOWN</div>
     <h1>Rota 360°<br>POV</h1>
-    <p>No Meta Quest, a experiência entra em WebXR imersivo — você assume o ponto de vista do percurso. O gatilho direito avança. O movimento da cabeça é rastreado 100%.</p>
+    <p>Meta Quest: thumbstick direito move pelo percurso e gira a câmera. Gatilho traseiro dispara. Cabeça rastreada 100%.</p>
     <div class="actions">
       <button class="primary" id="enterVrBtn">▶ Entrar em modo VR (Meta Quest)</button>
       <button id="screenBtn">Continuar no modo tela</button>
     </div>
-    <div class="note" id="gateNote">Modo tela: scroll · espaço · W · seta cima</div>
+    <div class="note" id="gateNote">Tela: WASD/setas mover · AD girar · Espaço avançar</div>
   </div>
 </section>
 
-<!-- LOADER -->
 <div class="loader" id="loader">
   <div class="panel">
     <div class="logo">HUBTOWN</div>
-    <div class="loader-label">
-      <span id="loaderStep">preparando cena</span>
-      <span id="loaderPct">0%</span>
-    </div>
+    <div class="loader-label"><span id="loaderStep">preparando</span><span id="loaderPct">0%</span></div>
     <div class="loader-track"><div class="loader-fill" id="loaderFill"></div></div>
     <div class="loader-status" id="loaderStatus">inicializando</div>
   </div>
 </div>
 
-<!-- CANVAS -->
 <canvas id="scene"></canvas>
 <div class="overlay"></div>
 
-<!-- HUD (screen mode only) -->
-<div class="title-ui" id="titleUi">
-  <div class="eyebrow" id="eyebrow">POV Route</div>
-  <h2 id="titleText">De cima,<br>torna-se o percurso</h2>
-  <small id="hintText">Scroll / Espaço / Gatilho Direito</small>
+<div class="title-ui">
+  <div class="eyebrow">POV Route</div>
+  <h2>De cima,<br>torna-se o percurso</h2>
+  <small id="hintText">Thumbstick direito · Gatilho = atirar</small>
 </div>
 
 <div class="hud">
   <span id="hudAlt">altitude 000</span>
-  <span id="hudSpd">gatilho 000</span>
+  <span id="hudSpd">stick 000</span>
   <span id="hudShots">tiros 000</span>
-  <span id="hudMode">modo carregando</span>
+  <span id="hudMode">carregando</span>
 </div>
 
 <div class="progress-box">
@@ -326,167 +93,128 @@
 <script type="module">
 import * as THREE from 'three';
 
-// ─── DOM refs ────────────────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
+// ── DOM ──────────────────────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
 const dom = {
-  canvas:      $('scene'),
-  gate:        $('modeGate'),
-  enterVrBtn:  $('enterVrBtn'),
-  screenBtn:   $('screenBtn'),
-  gateNote:    $('gateNote'),
-  loader:      $('loader'),
-  loaderStep:  $('loaderStep'),
-  loaderPct:   $('loaderPct'),
-  loaderFill:  $('loaderFill'),
-  loaderStatus:$('loaderStatus'),
-  fill:        $('fill'),
-  pct:         $('pct'),
-  hudAlt:      $('hudAlt'),
-  hudSpd:      $('hudSpd'),
-  hudMode:     $('hudMode'),
-  hintText:    $('hintText'),
+  gate:$('modeGate'), enterVrBtn:$('enterVrBtn'), screenBtn:$('screenBtn'),
+  gateNote:$('gateNote'), loader:$('loader'),
+  loaderStep:$('loaderStep'), loaderPct:$('loaderPct'),
+  loaderFill:$('loaderFill'), loaderStatus:$('loaderStatus'),
+  fill:$('fill'), pct:$('pct'),
+  hudAlt:$('hudAlt'), hudSpd:$('hudSpd'), hudShots:$('hudShots'), hudMode:$('hudMode'),
+  hintText:$('hintText'),
 };
 
-// ─── State ───────────────────────────────────────────────────────────────────
-const PATH_START = -80, PATH_END = 960;
-const MOVE_SPEED = 0.055;
+// ── Constants ────────────────────────────────────────────────────────────────
+const PATH_START=-80, PATH_END=960;
+const MOVE_SPEED=0.055, YAW_RATE=1.4, DEADZONE=0.12;
+const SHOT_COOLDOWN=200, PROJ_SPEED=18, PROJ_LIFE=2500;
 
-let mode          = 'screen'; // 'screen' | 'vr'
-let appStarted    = false;
-let xrSession     = null;
-let xrRefSpace    = null;
-let targetProgress  = 0;
-let smoothProgress  = 0;
-let loadPct       = 0;
+// ── State ────────────────────────────────────────────────────────────────────
+let mode='screen', appStarted=false, xrSession=null;
+let targetP=0, smoothP=0, loadPct=0, yawOffset=0, lastShot=-Infinity;
+const projectiles=[];
+const keyDown={fwd:false,back:false,left:false,right:false};
 
-let yawOffset = 0;   // accumulated yaw rotation from right thumbstick X
+// right-hand controller resolved at runtime via 'connected' event
+let rightGrip=null; // THREE.Group from renderer.xr.getControllerGrip()
 
-const projectiles = [];            // active projectile objects
-let lastShotTime  = -Infinity;     // timestamp of last shot (ms)
-const SHOT_COOLDOWN = 200;         // minimum ms between shots
-const PROJECTILE_SPEED  = 18;     // units per second
-const PROJECTILE_LIFE   = 2500;   // milliseconds before auto-removal
+// ── Scene core ───────────────────────────────────────────────────────────────
+const clock=new THREE.Clock();
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x020817,0.0025);
 
-// ─── Three.js core ───────────────────────────────────────────────────────────
-const clock  = new THREE.Clock();
-const scene  = new THREE.Scene();
-scene.fog    = new THREE.FogExp2(0x020817, 0.0025);
-
-let rightGripPose = null;          // XRPose updated every frame
-const handGroup = new THREE.Group();
-handGroup.name = 'right-hand-group';
-handGroup.visible = false;
-scene.add(handGroup);              // added directly to scene, NOT to playerRig
-
-/**
- * Player rig: holds the camera.
- * In SCREEN mode: we manually position + orient it along the path.
- * In VR mode:   we position it along the path but DO NOT touch orientation —
- *               the WebXR manager takes full control of the camera quaternion/position
- *               from the headset tracking data.
- */
-const playerRig = new THREE.Group();
-playerRig.name  = 'player-rig';
+const playerRig=new THREE.Group();
+playerRig.name='player-rig';
 scene.add(playerRig);
 
-const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 1800);
-camera.name  = 'pov-cam';
-camera.position.set(0, 1.62, 0);
+const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,0.05,1800);
+camera.position.set(0,1.62,0);
 playerRig.add(camera);
 
-const renderer = new THREE.WebGLRenderer({
-  canvas: dom.canvas,
-  antialias: true,
-  alpha: true,
-  powerPreference: 'high-performance',
+const renderer=new THREE.WebGLRenderer({
+  canvas:$('scene'), antialias:true, alpha:true, powerPreference:'high-performance'
 });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping      = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.18;
-renderer.xr.enabled = true;          // ← Required for WebXR to work
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.18;
+renderer.xr.enabled=true;  // REQUIRED for WebXR
 
-// ─── Lights ──────────────────────────────────────────────────────────────────
-const hemi     = new THREE.HemisphereLight(0x8fdfff, 0x020817, 1.9);
-const sun      = new THREE.DirectionalLight(0xd5e0ff, 2.2);
-sun.position.set(-80, 160, -40);
-const povLight = new THREE.PointLight(0x16bdff, 10, 140, 1.8);
-const rimLight = new THREE.PointLight(0x6f7dff,  6, 280, 2.0);
-scene.add(hemi, sun, povLight, rimLight);
+// ── Lights ───────────────────────────────────────────────────────────────────
+const hemi=new THREE.HemisphereLight(0x8fdfff,0x020817,1.9);
+const sun=new THREE.DirectionalLight(0xd5e0ff,2.2);
+sun.position.set(-80,160,-40);
+const povLight=new THREE.PointLight(0x16bdff,10,140,1.8);
+const rimLight=new THREE.PointLight(0x6f7dff,6,280,2);
+scene.add(hemi,sun,povLight,rimLight);
 
-// ─── Route math ──────────────────────────────────────────────────────────────
-function routeX(z, off = 0) {
-  return Math.sin(z * .019 + off) * 58
-       + Math.sin(z * .0065 + off * 2.2) * 42
-       + Math.cos(z * .044  + off) * 10;
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const lerp=(a,b,t)=>a+(b-a)*t;
+const clamp=(v,lo=0,hi=1)=>Math.max(lo,Math.min(hi,v));
+const eio=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+const dz=v=>Math.abs(v)>DEADZONE?v:0;
+
+function routeX(z,off=0){
+  return Math.sin(z*.019+off)*58+Math.sin(z*.0065+off*2.2)*42+Math.cos(z*.044+off)*10;
 }
-function terrainH(x, z) {
-  const road  = routeX(z);
-  const lr    = Math.exp(-Math.pow((x + 96 + Math.sin(z * .017) * 34) / 52, 2)) * 32;
-  const rr    = Math.exp(-Math.pow((x - 94 + Math.cos(z * .014) * 30) / 58, 2)) * 29;
-  const fr    = Math.exp(-Math.pow((x + Math.sin(z * .012) * 120) / 132, 2)) * 12;
-  const rv    = -Math.exp(-Math.pow((x - road) / 30, 2)) * 8.5;
-  const wav   = Math.sin(x * .052 + z * .017) * 4.1 + Math.cos(x * .022 - z * .029) * 4.5;
-  const slope = Math.sin(z * .005) * 6;
-  return lr + rr + fr + rv + wav + slope - 12;
+function terrainH(x,z){
+  const road=routeX(z);
+  const lr=Math.exp(-Math.pow((x+96+Math.sin(z*.017)*34)/52,2))*32;
+  const rr=Math.exp(-Math.pow((x-94+Math.cos(z*.014)*30)/58,2))*29;
+  const fr=Math.exp(-Math.pow((x+Math.sin(z*.012)*120)/132,2))*12;
+  const rv=-Math.exp(-Math.pow((x-road)/30,2))*8.5;
+  const wav=Math.sin(x*.052+z*.017)*4.1+Math.cos(x*.022-z*.029)*4.5;
+  return lr+rr+fr+rv+wav+Math.sin(z*.005)*6-12;
 }
 
-function lerp(a, b, t) { return a + (b - a) * t; }
-function clamp(v, lo = 0, hi = 1) { return Math.max(lo, Math.min(hi, v)); }
-function eio(t) { return t < .5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2; }
-
-class RoadCurve extends THREE.Curve {
-  getPoint(t, out = new THREE.Vector3()) {
-    const z = lerp(PATH_START, PATH_END, t);
-    const x = routeX(z);
-    return out.set(x, terrainH(x, z) + 1.8, z);
+class RoadCurve extends THREE.Curve{
+  getPoint(t,out=new THREE.Vector3()){
+    const z=lerp(PATH_START,PATH_END,t),x=routeX(z);
+    return out.set(x,terrainH(x,z)+1.8,z);
   }
 }
-class OffsetCurve extends THREE.Curve {
-  constructor(off) { super(); this.off = off; }
-  getPoint(t, out = new THREE.Vector3()) {
-    const z = lerp(PATH_START, PATH_END, t);
-    const x = routeX(z);
-    const dx = routeX(z + 4) - routeX(z - 4);
-    const s  = new THREE.Vector3(1, 0, -dx / 8).normalize();
-    const ox = s.x * this.off, oz = s.z * this.off;
-    return out.set(x + ox, terrainH(x + ox, z + oz) + 2, z + oz);
+class OffsetCurve extends THREE.Curve{
+  constructor(off){super();this.off=off;}
+  getPoint(t,out=new THREE.Vector3()){
+    const z=lerp(PATH_START,PATH_END,t),x=routeX(z);
+    const dx=routeX(z+4)-routeX(z-4);
+    const s=new THREE.Vector3(1,0,-dx/8).normalize();
+    return out.set(x+s.x*this.off,terrainH(x+s.x*this.off,z+s.z*this.off)+2,z+s.z*this.off);
   }
 }
-const roadCurve = new RoadCurve();
+const roadCurve=new RoadCurve();
 
-// ─── Load progress ───────────────────────────────────────────────────────────
-function setLoad(v, step = '', status = '') {
-  loadPct = Math.max(loadPct, Math.min(100, v));
-  dom.loaderFill.style.width = loadPct + '%';
-  dom.loaderPct.textContent  = Math.round(loadPct) + '%';
-  if (step)   dom.loaderStep.textContent   = step;
-  if (status) dom.loaderStatus.textContent = status;
+// ── Load bar ─────────────────────────────────────────────────────────────────
+function setLoad(v,step='',status=''){
+  loadPct=Math.max(loadPct,Math.min(100,v));
+  dom.loaderFill.style.width=loadPct+'%';
+  dom.loaderPct.textContent=Math.round(loadPct)+'%';
+  if(step) dom.loaderStep.textContent=step;
+  if(status) dom.loaderStatus.textContent=status;
 }
 
-// ─── Scene builders ──────────────────────────────────────────────────────────
-const mesh = {};   // named meshes we may animate
+// ── Mesh store ───────────────────────────────────────────────────────────────
+const M={auroras:[],gates:[],flow:[],muzzleGlow:null,stars:null};
 
-function buildSky() {
-  const N = 1300, pos = new Float32Array(N*3), col = new Float32Array(N*3);
-  for (let i=0;i<N;i++) {
-    const r = 420 + Math.random()*680, a = Math.random()*Math.PI*2;
-    pos[i*3]   = Math.cos(a)*r;
-    pos[i*3+1] = 80 + Math.random()*430;
-    pos[i*3+2] = PATH_START - 200 + Math.random()*(PATH_END-PATH_START+520);
-    const b = .55 + Math.random()*.45;
-    col[i*3] = .22*b; col[i*3+1] = .72*b; col[i*3+2] = 1;
+// ── Scene builders (unchanged geometry) ─────────────────────────────────────
+function buildSky(){
+  const N=1300,pos=new Float32Array(N*3),col=new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    const r=420+Math.random()*680,a=Math.random()*Math.PI*2;
+    pos[i*3]=Math.cos(a)*r; pos[i*3+1]=80+Math.random()*430;
+    pos[i*3+2]=PATH_START-200+Math.random()*(PATH_END-PATH_START+520);
+    const b=.55+Math.random()*.45;
+    col[i*3]=.22*b;col[i*3+1]=.72*b;col[i*3+2]=1;
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
-  g.setAttribute('color',    new THREE.BufferAttribute(col,3));
-  mesh.stars = new THREE.Points(g, new THREE.PointsMaterial({size:1.8,vertexColors:true,transparent:true,opacity:.64,blending:THREE.AdditiveBlending,depthWrite:false}));
-  mesh.stars.name = 'sky';
-  scene.add(mesh.stars);
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  M.stars=new THREE.Points(g,new THREE.PointsMaterial({size:1.8,vertexColors:true,transparent:true,opacity:.64,blending:THREE.AdditiveBlending,depthWrite:false}));
+  scene.add(M.stars);
 }
-
-function buildTerrain() {
+function buildTerrain(){
   const xMin=-210,xMax=210,zMin=PATH_START-90,zMax=PATH_END+120,xS=96,zS=300;
   const pos=[],col=[],idx=[];
   for(let zi=0;zi<=zS;zi++){
@@ -498,40 +226,31 @@ function buildTerrain() {
       col.push(.02+glow*.04,.17+glow*.18,.34+glow*.55);
     }
   }
-  for(let zi=0;zi<zS;zi++){
-    for(let xi=0;xi<xS;xi++){
-      const a=zi*(xS+1)+xi;
-      idx.push(a,a+xS+1,a+1,a+1,a+xS+1,a+xS+2);
-    }
+  for(let zi=0;zi<zS;zi++)for(let xi=0;xi<xS;xi++){
+    const a=zi*(xS+1)+xi;
+    idx.push(a,a+xS+1,a+1,a+1,a+xS+1,a+xS+2);
   }
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
-  g.setAttribute('color',   new THREE.Float32BufferAttribute(col,3));
-  g.setIndex(idx);
-  g.computeVertexNormals();
+  g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  g.setIndex(idx);g.computeVertexNormals();
   scene.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78,metalness:.08,emissive:0x03172b,emissiveIntensity:.42,transparent:true,opacity:.9})));
   scene.add(new THREE.LineSegments(new THREE.WireframeGeometry(g),new THREE.LineBasicMaterial({color:0x14b9ff,transparent:true,opacity:.11,blending:THREE.AdditiveBlending})));
 }
-
-function buildRoad() {
-  const glowM = new THREE.MeshBasicMaterial({color:0x14b9ff,transparent:true,opacity:.18,blending:THREE.AdditiveBlending,depthWrite:false});
-  const lineM = new THREE.MeshBasicMaterial({color:0xd5e0ff,transparent:true,opacity:.98,blending:THREE.AdditiveBlending,depthWrite:false});
-  const haloM = new THREE.MeshBasicMaterial({color:0x0a72ff,transparent:true,opacity:.075,blending:THREE.AdditiveBlending,depthWrite:false});
+function buildRoad(){
+  const gM=new THREE.MeshBasicMaterial({color:0x14b9ff,transparent:true,opacity:.18,blending:THREE.AdditiveBlending,depthWrite:false});
+  const lM=new THREE.MeshBasicMaterial({color:0xd5e0ff,transparent:true,opacity:.98,blending:THREE.AdditiveBlending,depthWrite:false});
+  const hM=new THREE.MeshBasicMaterial({color:0x0a72ff,transparent:true,opacity:.075,blending:THREE.AdditiveBlending,depthWrite:false});
   [-9.2,-5.4,-2.7,0,2.7,5.4,9.2].forEach((off,i)=>{
-    const ctr = i===3;
-    const curve = new OffsetCurve(off);
-    const g = new THREE.Mesh(new THREE.TubeGeometry(curve,720,ctr?4.2:2.2,12,false),glowM.clone());
-    g.material.opacity = ctr?.32:.15; scene.add(g);
-    const l = new THREE.Mesh(new THREE.TubeGeometry(curve,720,ctr?.86:.38,8,false),lineM.clone());
-    l.material.opacity = ctr?1:.68;
-    if(ctr) l.name='road-center';
-    scene.add(l);
-    if(ctr) scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve,720,9.5,14,false),haloM.clone()));
+    const ctr=i===3,curve=new OffsetCurve(off);
+    const g=new THREE.Mesh(new THREE.TubeGeometry(curve,720,ctr?4.2:2.2,12,false),gM.clone());
+    g.material.opacity=ctr?.32:.15;scene.add(g);
+    const l=new THREE.Mesh(new THREE.TubeGeometry(curve,720,ctr?.86:.38,8,false),lM.clone());
+    l.material.opacity=ctr?1:.68;scene.add(l);
+    if(ctr)scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve,720,9.5,14,false),hM.clone()));
   });
 }
-
-mesh.auroras = [];
-function buildAuroras() {
+function buildAuroras(){
   const mats=[
     new THREE.MeshBasicMaterial({color:0x14b9ff,transparent:true,opacity:.1,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}),
     new THREE.MeshBasicMaterial({color:0x6f7dff,transparent:true,opacity:.075,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}),
@@ -543,525 +262,393 @@ function buildAuroras() {
       pts.push(new THREE.Vector3(routeX(z)+side*(120+r*34+Math.sin(t*Math.PI*5+r)*18),54+Math.sin(t*Math.PI*4+r)*18+r*8,z));
     }
     const m=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),360,2.2+r*.35,8,false),mats[r%2].clone());
-    m.name=`aurora-${r}`; mesh.auroras.push(m); scene.add(m);
+    M.auroras.push(m);scene.add(m);
   }
 }
-
-mesh.gates = [];
-function buildGates() {
+function buildGates(){
   const pt=new THREE.Vector3(),tan=new THREE.Vector3();
   const mat=new THREE.MeshBasicMaterial({color:0x14b9ff,transparent:true,opacity:.22,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
   for(let i=0;i<18;i++){
     const t=.08+i*.05;
-    roadCurve.getPoint(t,pt); roadCurve.getTangent(t,tan).normalize();
+    roadCurve.getPoint(t,pt);roadCurve.getTangent(t,tan).normalize();
     const g=new THREE.Mesh(new THREE.TorusGeometry(13+(i%3)*2,.18,8,72),mat.clone());
     g.position.copy(pt).add(new THREE.Vector3(0,8+(i%2)*3,0));
     g.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),tan);
     g.userData={baseT:t,phase:Math.random()*Math.PI*2};
-    mesh.gates.push(g); scene.add(g);
+    M.gates.push(g);scene.add(g);
   }
 }
-
-mesh.flow = [];
-function buildFlow() {
+function buildFlow(){
   const mat=new THREE.MeshBasicMaterial({color:0xd5e0ff,transparent:true,opacity:.82,blending:THREE.AdditiveBlending,depthWrite:false});
-  const lanes=[-5.4,-2.7,0,2.7,5.4];
   for(let i=0;i<52;i++){
     const orb=new THREE.Mesh(new THREE.SphereGeometry(.9+Math.random()*.9,10,10),mat.clone());
-    orb.userData={offset:Math.random(),speed:.045+Math.random()*.035,lane:lanes[i%5]};
-    mesh.flow.push(orb); scene.add(orb);
+    orb.userData={offset:Math.random(),speed:.045+Math.random()*.035,lane:[-5.4,-2.7,0,2.7,5.4][i%5]};
+    M.flow.push(orb);scene.add(orb);
   }
 }
-
-function buildTowers() {
+function buildTowers(){
   const mat=new THREE.MeshStandardMaterial({color:0x15c7ff,emissive:0x0c6eaa,emissiveIntensity:.68,roughness:.42,metalness:.16,transparent:true,opacity:.5});
-  const glowM=new THREE.MeshBasicMaterial({color:0x6f7dff,transparent:true,opacity:.12,blending:THREE.AdditiveBlending,depthWrite:false});
+  const gM=new THREE.MeshBasicMaterial({color:0x6f7dff,transparent:true,opacity:.12,blending:THREE.AdditiveBlending,depthWrite:false});
   for(let i=0;i<48;i++){
-    const z=PATH_START+70+i*20+Math.sin(i*1.6)*12;
-    const side=i%2===0?-1:1;
-    const x=routeX(z)+side*(48+Math.random()*105);
-    const y=terrainH(x,z);
+    const z=PATH_START+70+i*20+Math.sin(i*1.6)*12,side=i%2===0?-1:1;
+    const x=routeX(z)+side*(48+Math.random()*105),y=terrainH(x,z);
     const sx=6+Math.random()*16,sy=12+Math.random()*48,sz=6+Math.random()*16;
     const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat.clone());
-    m.position.set(x,y+sy/2,z); m.rotation.y=Math.random()*Math.PI;
-    scene.add(m);
-    const gm=new THREE.Mesh(new THREE.BoxGeometry(sx*1.18,sy*1.08,sz*1.18),glowM.clone());
-    gm.position.copy(m.position); gm.rotation.copy(m.rotation); scene.add(gm);
+    m.position.set(x,y+sy/2,z);m.rotation.y=Math.random()*Math.PI;scene.add(m);
+    const gm=new THREE.Mesh(new THREE.BoxGeometry(sx*1.18,sy*1.08,sz*1.18),gM.clone());
+    gm.position.copy(m.position);gm.rotation.copy(m.rotation);scene.add(gm);
     m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry),new THREE.LineBasicMaterial({color:0xd5e0ff,transparent:true,opacity:.22,blending:THREE.AdditiveBlending})));
   }
 }
-
-function buildDust() {
-  const N=900, pos=new Float32Array(N*3);
+function buildDust(){
+  const N=900,pos=new Float32Array(N*3);
   for(let i=0;i<N;i++){
-    const z=PATH_START-60+Math.random()*(PATH_END-PATH_START+180);
-    const x=(Math.random()-.5)*430;
-    pos[i*3]=x; pos[i*3+1]=terrainH(x,z)+5+Math.random()*46; pos[i*3+2]=z;
+    const z=PATH_START-60+Math.random()*(PATH_END-PATH_START+180),x=(Math.random()-.5)*430;
+    pos[i*3]=x;pos[i*3+1]=terrainH(x,z)+5+Math.random()*46;pos[i*3+2]=z;
   }
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.BufferAttribute(pos,3));
   scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0x14b9ff,size:1.25,transparent:true,opacity:.56,blending:THREE.AdditiveBlending,depthWrite:false})));
 }
-
-function buildCockpit() {
-  // Cockpit frame added to camera (follows head in VR, follows cam in screen)
-  const grp=new THREE.Group(); grp.name='cockpit';
+function buildCockpit(){
+  const grp=new THREE.Group();
   const ring=new THREE.Mesh(new THREE.TorusGeometry(.78,.006,8,96),new THREE.MeshBasicMaterial({color:0x14b9ff,transparent:true,opacity:.22,blending:THREE.AdditiveBlending,depthWrite:false}));
-  ring.position.set(0,0,-1.35); ring.scale.y=.52; grp.add(ring);
+  ring.position.set(0,0,-1.35);ring.scale.y=.52;grp.add(ring);
   for(let i=0;i<8;i++){
     const bar=new THREE.Mesh(new THREE.BoxGeometry(.12,.006,.006),new THREE.MeshBasicMaterial({color:0xd5e0ff,transparent:true,opacity:.36,blending:THREE.AdditiveBlending,depthWrite:false}));
     const a=(i/8)*Math.PI*2;
-    bar.position.set(Math.cos(a)*.52,Math.sin(a)*.28,-1.34); bar.rotation.z=a;
+    bar.position.set(Math.cos(a)*.52,Math.sin(a)*.28,-1.34);bar.rotation.z=a;
     grp.add(bar);
   }
   camera.add(grp);
 }
 
-function buildArquinha() {
-  // Body of the weapon — a small rectangular box
-  const bodyGeo = new THREE.BoxGeometry(0.08, 0.06, 0.14);
-  const bodyMat = new THREE.MeshStandardMaterial({
-    color: 0x14b9ff,
-    emissive: 0x0a4466,
-    emissiveIntensity: 0.9,
-    roughness: 0.3,
-    metalness: 0.7,
-    transparent: true,
-    opacity: 0.92,
-  });
-  const body = new THREE.Mesh(bodyGeo, bodyMat);
-  body.name = 'arquinha-body';
+// ── ARQUINHA + CONTROLLERS ───────────────────────────────────────────────────
+/**
+ * THE FIX:
+ * renderer.xr.getControllerGrip(i) returns a THREE.Group whose world matrix
+ * is updated by Three.js WebXRManager EVERY XR FRAME automatically, directly
+ * from the WebXR gripSpace pose, using the session's internal reference space.
+ *
+ * We just add the weapon mesh as a child of that group.
+ * Three.js handles all the position+orientation sync — no manual getPose needed.
+ *
+ * We register 'connected' events on both grips (index 0 and 1) to detect
+ * which one is the right hand at runtime (index is not deterministic).
+ */
+function buildWeaponAndControllers(){
+  // Weapon geometry
+  const geo=new THREE.BoxGeometry(0.08,0.06,0.14);
+  const body=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({
+    color:0x14b9ff,emissive:0x0a4466,emissiveIntensity:0.9,
+    roughness:0.3,metalness:0.7,transparent:true,opacity:0.92,
+  }));
 
-  // Wireframe edge overlay for the sci-fi look
-  const edgesGeo = new THREE.EdgesGeometry(bodyGeo);
-  const edgesMat = new THREE.LineBasicMaterial({
-    color: 0xd5e0ff,
-    transparent: true,
-    opacity: 0.9,
-    blending: THREE.AdditiveBlending,
-  });
-  const edges = new THREE.LineSegments(edgesGeo, edgesMat);
-  edges.name = 'arquinha-edges';
-
-  // Muzzle glow — small point light at the front tip of the weapon
-  // Front of weapon = +Z in local space (box extends 0.07 along Z from center)
-  const muzzleGlow = new THREE.PointLight(0x14b9ff, 0, 0.3, 2.0);
-  muzzleGlow.position.set(0, 0, 0.07);
-  muzzleGlow.name = 'muzzle-glow';
-
-  // Muzzle visual indicator — tiny sphere at front
-  const muzzleDot = new THREE.Mesh(
-    new THREE.SphereGeometry(0.008, 8, 8),
-    new THREE.MeshBasicMaterial({
-      color: 0x14b9ff,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
+  // Sci-fi wireframe overlay
+  const edges=new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo),
+    new THREE.LineBasicMaterial({color:0xd5e0ff,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending})
   );
-  muzzleDot.position.set(0, 0, 0.07);
-  muzzleDot.name = 'muzzle-dot';
 
-  handGroup.add(body, edges, muzzleGlow, muzzleDot);
+  // Muzzle glow light at +Z tip (forward of the weapon in local space)
+  const muzzleGlow=new THREE.PointLight(0x14b9ff,0,0.5,2.0);
+  muzzleGlow.position.set(0,0,0.09);
+  M.muzzleGlow=muzzleGlow;
 
-  // Store ref to muzzleGlow for shooting flash effect
-  mesh.muzzleGlow = muzzleGlow;
-}
+  // Muzzle dot indicator
+  const dot=new THREE.Mesh(
+    new THREE.SphereGeometry(0.009,8,8),
+    new THREE.MeshBasicMaterial({color:0x14b9ff,blending:THREE.AdditiveBlending,depthWrite:false})
+  );
+  dot.position.set(0,0,0.09);
 
-function spawnProjectile() {
-  if (!handGroup.visible) return;   // only shoot if hand is tracked
+  // Weapon group
+  const weapon=new THREE.Group();
+  weapon.name='arquinha';
+  weapon.add(body,edges,muzzleGlow,dot);
 
-  const now = performance.now();
-  if (now - lastShotTime < SHOT_COOLDOWN) return;
-  lastShotTime = now;
+  // Register both grip slots and wire the weapon to whichever is 'right'
+  for(let i=0;i<=1;i++){
+    const grip=renderer.xr.getControllerGrip(i);
+    scene.add(grip); // MUST be added to scene (world space), NOT playerRig
 
-  // The weapon's forward direction is -Z in its local space.
-  // Transform to world space using the handGroup world quaternion.
-  const forward = new THREE.Vector3(0, 0, -1);
-  forward.applyQuaternion(handGroup.getWorldQuaternion(new THREE.Quaternion()));
+    grip.addEventListener('connected',(evt)=>{
+      if(evt.data?.handedness==='right'){
+        rightGrip=grip;
+        // Only add weapon once (guard against re-connect events)
+        if(!grip.getObjectByName('arquinha')) grip.add(weapon);
+        console.log('[HUBTOWN] right hand = grip index',i);
+      }
+    });
 
-  // Spawn position = muzzle tip in world space
-  const spawnPos = new THREE.Vector3();
-  handGroup.getWorldPosition(spawnPos);
-  spawnPos.addScaledVector(forward, 0.12); // offset slightly ahead of muzzle
+    grip.addEventListener('disconnected',()=>{
+      if(grip===rightGrip) rightGrip=null;
+    });
+  }
 
-  const geo = new THREE.SphereGeometry(0.04, 8, 8);
-  const mat = new THREE.MeshBasicMaterial({
-    color: 0xd5e0ff,
-    transparent: true,
-    opacity: 0.95,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-  const pMesh = new THREE.Mesh(geo, mat);
-  pMesh.position.copy(spawnPos);
-  pMesh.name = 'projectile';
-
-  // Trail light on each projectile
-  const pLight = new THREE.PointLight(0xd5e0ff, 4, 1.2, 2.2);
-  pMesh.add(pLight);
-
-  scene.add(pMesh);
-
-  projectiles.push({
-    mesh:     pMesh,
-    velocity: forward.multiplyScalar(PROJECTILE_SPEED),
-    bornAt:   now,
-  });
-
-  // Muzzle flash — brief spike on the muzzle glow light
-  if (mesh.muzzleGlow) {
-    mesh.muzzleGlow.intensity = 8;
-    setTimeout(() => { if (mesh.muzzleGlow) mesh.muzzleGlow.intensity = 0; }, 80);
+  // Also listen via selectstart on the controller (ray space) for shooting
+  // as a backup — Three.js fires this reliably on index trigger press
+  for(let i=0;i<=1;i++){
+    const ctrl=renderer.xr.getController(i);
+    scene.add(ctrl);
+    ctrl.addEventListener('connected',(evt)=>{
+      if(evt.data?.handedness==='right'){
+        // selectstart fires on index trigger press for the right controller
+        ctrl.addEventListener('selectstart',()=>spawnProjectile());
+      }
+    });
   }
 }
 
-function updateProjectiles(delta) {
-  const now = performance.now();
-  for (let i = projectiles.length - 1; i >= 0; i--) {
-    const p = projectiles[i];
+// ── PROJECTILE SYSTEM ────────────────────────────────────────────────────────
+function spawnProjectile(){
+  if(!rightGrip) return;
+  const now=performance.now();
+  if(now-lastShot<SHOT_COOLDOWN) return;
+  lastShot=now;
 
-    // Advance position
-    p.mesh.position.addScaledVector(p.velocity, delta);
+  // World quaternion of the grip group (already up-to-date from Three.js XR manager)
+  const wq=new THREE.Quaternion();
+  rightGrip.getWorldQuaternion(wq);
 
-    // Fade out in last 500ms of life
-    const age      = now - p.bornAt;
-    const lifeRatio = age / PROJECTILE_LIFE;
-    p.mesh.material.opacity = 0.95 * (1 - Math.max(0, (lifeRatio - 0.8) / 0.2));
+  // Weapon forward = -Z local → world
+  const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(wq);
 
-    // Remove if expired
-    if (age > PROJECTILE_LIFE) {
+  // Spawn at muzzle tip (world pos of grip + offset along forward)
+  const pos=new THREE.Vector3();
+  rightGrip.getWorldPosition(pos);
+  pos.addScaledVector(fwd,0.14);
+
+  const pMesh=new THREE.Mesh(
+    new THREE.SphereGeometry(0.04,8,8),
+    new THREE.MeshBasicMaterial({color:0xd5e0ff,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false})
+  );
+  pMesh.position.copy(pos);
+  pMesh.add(new THREE.PointLight(0xd5e0ff,5,1.4,2.2));
+  scene.add(pMesh);
+
+  projectiles.push({mesh:pMesh,vel:fwd.multiplyScalar(PROJ_SPEED),born:now});
+
+  // Muzzle flash
+  if(M.muzzleGlow){
+    M.muzzleGlow.intensity=10;
+    setTimeout(()=>{if(M.muzzleGlow)M.muzzleGlow.intensity=0;},80);
+  }
+}
+
+function updateProjectiles(delta){
+  const now=performance.now();
+  for(let i=projectiles.length-1;i>=0;i--){
+    const p=projectiles[i];
+    p.mesh.position.addScaledVector(p.vel,delta);
+    const life=(now-p.born)/PROJ_LIFE;
+    p.mesh.material.opacity=0.95*(1-Math.max(0,(life-0.8)/0.2));
+    if(life>1){
       scene.remove(p.mesh);
       p.mesh.geometry.dispose();
       p.mesh.material.dispose();
-      projectiles.splice(i, 1);
+      projectiles.splice(i,1);
     }
   }
 }
 
-// Trail
-const trailPts = Array.from({length:60},()=>new THREE.Vector3());
-const trailLine = new THREE.Line(
+// ── Trail ────────────────────────────────────────────────────────────────────
+const trailPts=Array.from({length:60},()=>new THREE.Vector3());
+const trailLine=new THREE.Line(
   new THREE.BufferGeometry().setFromPoints(trailPts),
   new THREE.LineBasicMaterial({color:0xd5e0ff,transparent:true,opacity:.55,blending:THREE.AdditiveBlending})
 );
-trailLine.frustumCulled = false;
+trailLine.frustumCulled=false;
 scene.add(trailLine);
 
-// ─── POV update ──────────────────────────────────────────────────────────────
-const _pt  = new THREE.Vector3();
-const _tan = new THREE.Vector3();
-const _flat= new THREE.Vector3();
-const _q   = new THREE.Quaternion();
-const _fwd = new THREE.Vector3(0,0,-1);
-const _up  = new THREE.Vector3(0,1,0);
-const _side= new THREE.Vector3();
+// ── POV ──────────────────────────────────────────────────────────────────────
+const _pt=new THREE.Vector3(),_tan=new THREE.Vector3(),_flat=new THREE.Vector3();
+const _q=new THREE.Quaternion(),_fwd=new THREE.Vector3(0,0,-1),_up=new THREE.Vector3(0,1,0),_side=new THREE.Vector3();
 
-function updatePOV(sY) {
-  const t    = eio(smoothProgress);
-  const pathT= clamp(t * .965 + .018);
+function updatePOV(sY){
+  const t=eio(smoothP),pathT=clamp(t*.965+.018);
+  roadCurve.getPoint(pathT,_pt);
+  roadCurve.getTangent(pathT,_tan).normalize();
+  _flat.set(_tan.x,0,_tan.z).normalize();
+  _side.crossVectors(_up,_flat).normalize();
+  _q.setFromUnitVectors(_fwd,_flat);
 
-  roadCurve.getPoint(pathT, _pt);
-  roadCurve.getTangent(pathT, _tan).normalize();
-  _flat.set(_tan.x, 0, _tan.z).normalize();
-  _side.crossVectors(_up, _flat).normalize();
-  _q.setFromUnitVectors(_fwd, _flat);
+  const drop=eio(clamp((smoothP-.02)/.25)),alt=lerp(112,3.2,drop);
+  playerRig.position.lerp(new THREE.Vector3(_pt.x,_pt.y+alt,_pt.z),mode==='vr'?.28:.12);
 
-  const drop    = eio(clamp((smoothProgress - .02) / .25));
-  const altitude= lerp(112, 3.2, drop);
-
-  // Position the rig along the route
-  const target = new THREE.Vector3(_pt.x, _pt.y + altitude, _pt.z);
-  playerRig.position.lerp(target, mode === 'vr' ? .28 : .12);
-
-  /**
-   * CRITICAL VR FIX:
-   * In screen mode → rotate the rig to face along the route.
-   * In VR mode     → DO NOT touch playerRig.quaternion or camera.rotation.
-   *                  Three.js WebXR manager (renderer.xr) applies the headset
-   *                  pose directly to the camera every frame. If we overwrite it
-   *                  we break head-tracking sync completely.
-   */
-  // Apply yaw offset on top of route orientation
-  // Create a quaternion for the yaw delta and multiply into playerRig
-  const yawQ = new THREE.Quaternion();
-  yawQ.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawOffset);
-  // In VR: playerRig.quaternion = yawQ (pure yaw, headset handles the rest)
-  // In screen: playerRig.quaternion = _q * yawQ (route direction + yaw)
-  if (mode === 'vr') {
+  // Yaw quaternion from thumbstick X accumulation
+  const yawQ=new THREE.Quaternion().setFromAxisAngle(_up,yawOffset);
+  if(mode==='vr'){
+    // VR: only yaw the rig; WebXR manager applies head orientation on top
     playerRig.quaternion.copy(yawQ);
   } else {
+    // Screen: route direction × yaw
     playerRig.quaternion.copy(_q).multiply(yawQ);
-    camera.position.set(0, 1.62, 0);
-    camera.rotation.x = THREE.MathUtils.degToRad(-4);
+    camera.position.set(0,1.62,0);
+    camera.rotation.x=THREE.MathUtils.degToRad(-4);
   }
-  // In VR: rig is at the path position; headset rotation is applied on top by WebXR
-  // We only set the resting eye-height offset once (handled by 'local-floor' ref space)
 
-  // Lights follow rig
-  povLight.position.copy(playerRig.position).add(new THREE.Vector3(0, 6, 0));
-  rimLight.position.copy(playerRig.position)
-    .add(_side.clone().multiplyScalar(42))
-    .add(new THREE.Vector3(0, 28, -18));
+  povLight.position.copy(playerRig.position).add(new THREE.Vector3(0,6,0));
+  rimLight.position.copy(playerRig.position).add(_side.clone().multiplyScalar(42)).add(new THREE.Vector3(0,28,-18));
 
-  // Trail
-  for (let i=0;i<trailPts.length;i++) {
-    roadCurve.getPoint(clamp(pathT - i * .0016), trailPts[i]);
-    trailPts[i].y += 2.2;
+  for(let i=0;i<trailPts.length;i++){
+    roadCurve.getPoint(clamp(pathT-i*.0016),trailPts[i]);
+    trailPts[i].y+=2.2;
   }
   trailLine.geometry.setFromPoints(trailPts);
-  trailLine.material.opacity = lerp(.14, .72, Math.abs(sY));
+  trailLine.material.opacity=lerp(.14,.72,Math.abs(sY));
 
-  // HUD
-  dom.hudAlt.textContent  = `altitude ${Math.round(playerRig.position.y).toString().padStart(3,'0')}`;
-  dom.hudSpd.textContent  = `stick ${Math.round(Math.abs(sY) * 100).toString().padStart(3,'0')}`;
-  dom.hudMode.textContent = mode === 'vr' ? 'meta quest · gatilho' : 'tela · scroll/espaço';
-  dom.fill.style.width    = (smoothProgress * 100).toFixed(1) + '%';
-  dom.pct.textContent     = Math.round(smoothProgress * 100) + '%';
-
+  dom.hudAlt.textContent=`altitude ${Math.round(playerRig.position.y).toString().padStart(3,'0')}`;
+  dom.hudSpd.textContent=`stick ${Math.round(Math.abs(sY)*100).toString().padStart(3,'0')}`;
+  dom.hudMode.textContent=mode==='vr'?'quest · stick dir':'tela · teclado';
+  dom.fill.style.width=(smoothP*100).toFixed(1)+'%';
+  dom.pct.textContent=Math.round(smoothP*100)+'%';
   return pathT;
 }
 
-function updateWorld(elapsed, pathT, triggerVal) {
-  if (mesh.stars) {
-    mesh.stars.rotation.y = elapsed * .008;
-    mesh.stars.material.opacity = lerp(.64, .38, smoothProgress);
-  }
-  mesh.auroras.forEach((r,i) => {
-    r.position.y = Math.sin(elapsed * .38 + i) * 2.2;
-    r.material.opacity = .06 + Math.sin(elapsed * .7 + i) * .018;
+function updateWorld(elapsed,pathT,sY){
+  if(M.stars){M.stars.rotation.y=elapsed*.008;M.stars.material.opacity=lerp(.64,.38,smoothP);}
+  M.auroras.forEach((r,i)=>{r.position.y=Math.sin(elapsed*.38+i)*2.2;r.material.opacity=.06+Math.sin(elapsed*.7+i)*.018;});
+  M.gates.forEach(g=>{
+    const d=Math.abs(g.userData.baseT-pathT),prox=clamp(1-d/.06);
+    g.material.opacity=.055+prox*.52;
+    g.scale.setScalar(1+prox*.32+Math.sin(elapsed*2.8+g.userData.phase)*.025);
+    g.rotation.z+=.006+prox*.018;
   });
-  mesh.gates.forEach(g => {
-    const d = Math.abs(g.userData.baseT - pathT);
-    const prox = clamp(1 - d / .06);
-    g.material.opacity = .055 + prox * .52;
-    g.scale.setScalar(1 + prox * .32 + Math.sin(elapsed * 2.8 + g.userData.phase) * .025);
-    g.rotation.z += .006 + prox * .018;
-  });
-  mesh.flow.forEach((orb,i) => {
-    const ft = (pathT + orb.userData.offset * .08 + elapsed * orb.userData.speed + triggerVal * .01) % 1;
-    const z  = lerp(PATH_START, PATH_END, ft);
-    const x  = routeX(z);
-    const dx = routeX(z+4) - routeX(z-4);
-    const s  = new THREE.Vector3(1,0,-dx/8).normalize();
-    orb.position.set(x + s.x*orb.userData.lane, terrainH(x,z)+3.2+Math.sin(elapsed*4+i)*.5, z + s.z*orb.userData.lane);
-    orb.material.opacity = .12 + clamp(1 - Math.abs(ft-pathT)/.12) * .78;
-    orb.scale.setScalar(.8 + Math.sin(elapsed*5+i)*.18);
+  M.flow.forEach((orb,i)=>{
+    const ft=(pathT+orb.userData.offset*.08+elapsed*orb.userData.speed+Math.abs(sY)*.01)%1;
+    const z=lerp(PATH_START,PATH_END,ft),x=routeX(z);
+    const dx=routeX(z+4)-routeX(z-4);
+    const s=new THREE.Vector3(1,0,-dx/8).normalize();
+    orb.position.set(x+s.x*orb.userData.lane,terrainH(x,z)+3.2+Math.sin(elapsed*4+i)*.5,z+s.z*orb.userData.lane);
+    orb.material.opacity=.12+clamp(1-Math.abs(ft-pathT)/.12)*.78;
+    orb.scale.setScalar(.8+Math.sin(elapsed*5+i)*.18);
   });
 }
 
-// ─── Render loop ─────────────────────────────────────────────────────────────
-function renderLoop(timestamp, xrFrame) {
-  if (!appStarted) return;
+// ── Render loop ──────────────────────────────────────────────────────────────
+function renderLoop(timestamp,xrFrame){
+  if(!appStarted) return;
+  const delta=Math.min(clock.getDelta(),.05);
+  const elapsed=clock.elapsedTime;
 
-  const delta   = Math.min(clock.getDelta(), .05);
-  const elapsed = clock.elapsedTime;
+  let sX=0,sY=0;
 
-  // Update right hand grip pose from XRFrame
-  // xrFrame is passed as second argument to the renderLoop by renderer.xr
-  rightGripPose = null;
-  handGroup.visible = false;
-
-  if (mode === 'vr' && xrSession && xrFrame) {
-    for (const src of xrSession.inputSources) {
-      if (src.handedness !== 'right' || !src.gripSpace) continue;
-      try {
-        const pose = xrFrame.getPose(src.gripSpace, xrRefSpace);
-        if (pose) {
-          rightGripPose = pose;
-          // Decompose the 4x4 column-major matrix from WebXR into Three.js objects
-          const m = new THREE.Matrix4();
-          m.fromArray(pose.transform.matrix);
-          // Extract position and quaternion from the matrix
-          const pos = new THREE.Vector3();
-          const quat = new THREE.Quaternion();
-          const scale = new THREE.Vector3();
-          m.decompose(pos, quat, scale);
-          handGroup.position.copy(pos);
-          handGroup.quaternion.copy(quat);
-          handGroup.visible = true;
-        }
-      } catch(e) { /* gripSpace may not be available every frame */ }
+  if(mode==='vr' && xrSession){
+    // Read right controller gamepad (xr-standard mapping)
+    // axes[2]=thumbstick X, axes[3]=thumbstick Y (-1=forward on Quest)
+    // buttons[0]=index trigger (.pressed)
+    for(const src of xrSession.inputSources){
+      if(src.handedness!=='right') continue;
+      const gp=src.gamepad;
+      if(!gp) break;
+      sX=dz(gp.axes?.[2]??0);
+      sY=dz(gp.axes?.[3]??0);
+      // Shooting via gamepad polling (complement to selectstart event)
+      // selectstart already handles it; this adds analog-trigger support (value>0.85)
+      if((gp.buttons?.[0]?.value??0)>0.85) spawnProjectile();
       break;
     }
+    targetP=clamp(targetP+delta*MOVE_SPEED*-sY); // forward = -Y
+    yawOffset+=sX*delta*YAW_RATE;
+  } else {
+    if(keyDown.fwd)  targetP=clamp(targetP+delta*MOVE_SPEED);
+    if(keyDown.back) targetP=clamp(targetP-delta*MOVE_SPEED);
+    yawOffset+=(keyDown.right?1:keyDown.left?-1:0)*delta*YAW_RATE;
   }
 
-  // Detect right index trigger press (buttons[0]) for shooting
-  if (mode === 'vr' && xrSession) {
-    for (const src of xrSession.inputSources) {
-      if (src.handedness !== 'right') continue;
-      const gp = src.gamepad;
-      if (!gp || !gp.buttons || !gp.buttons[0]) continue;
-      // Use .pressed (boolean) not .value for shot trigger
-      // to ensure single-shot per press, combined with cooldown
-      if (gp.buttons[0].pressed) {
-        spawnProjectile();
-      }
-      break;
-    }
-  }
-
-  // Read right thumbstick from xr-standard mapping
-  // axes[2] = thumbstick X (horizontal), axes[3] = thumbstick Y (vertical)
-  // On Meta Quest: pushing thumbstick FORWARD = axes[3] negative value
-  // pushing thumbstick BACK = axes[3] positive value
-
-  let stickX = 0;  // horizontal — used for yaw offset
-  let stickY = 0;  // vertical   — used for route progress
-
-  if (mode === 'vr' && xrSession) {
-    for (const src of xrSession.inputSources) {
-      if (src.handedness !== 'right') continue;
-      const gp = src.gamepad;
-      if (!gp || !gp.axes || gp.axes.length < 4) continue;
-      stickX = gp.axes[2] ?? 0;   // -1 (left) to +1 (right)
-      stickY = gp.axes[3] ?? 0;   // -1 (forward) to +1 (back)
-      break;
-    }
-  }
-
-  // Apply deadzone of 0.12 to both axes to avoid drift
-  const DZ = 0.12;
-  const sX = Math.abs(stickX) > DZ ? stickX : 0;
-  const sY = Math.abs(stickY) > DZ ? stickY : 0;
-
-  // Route progress: forward = negative Y on Quest thumbstick
-  // MOVE_SPEED stays at 0.055 as defined
-  targetProgress = clamp(targetProgress + delta * MOVE_SPEED * -sY);
-  smoothProgress += (targetProgress - smoothProgress) * 0.18;
-
-  // Yaw offset: accumulate horizontal rotation from thumbstick X
-  // Rate: 1.4 radians/second at full deflection
-  yawOffset += sX * delta * 1.4;
-
-  const pathT = updatePOV(sY);
-  updateWorld(elapsed, clamp(eio(smoothProgress) * .965 + .018), Math.abs(sY));
-
+  smoothP+=(targetP-smoothP)*(mode==='vr'?.18:.06);
+  const pathT=updatePOV(sY);
+  updateWorld(elapsed,pathT,sY);
   updateProjectiles(delta);
-  document.getElementById('hudShots').textContent =
-    `tiros ${projectiles.length.toString().padStart(3,'0')}`;
-
-  renderer.render(scene, camera);
+  dom.hudShots.textContent=`tiros ${projectiles.length.toString().padStart(3,'0')}`;
+  renderer.render(scene,camera);
 }
 
-// ─── Resize ──────────────────────────────────────────────────────────────────
-function onResize() {
-  camera.aspect = innerWidth / innerHeight;
+// ── Keyboard (screen mode) ────────────────────────────────────────────────────
+window.addEventListener('keydown',e=>{
+  if(['ArrowUp','KeyW','Space'].includes(e.code)) keyDown.fwd=true;
+  if(['ArrowDown','KeyS'].includes(e.code))        keyDown.back=true;
+  if(['ArrowLeft','KeyA'].includes(e.code))        keyDown.left=true;
+  if(['ArrowRight','KeyD'].includes(e.code))       keyDown.right=true;
+});
+window.addEventListener('keyup',e=>{
+  if(['ArrowUp','KeyW','Space'].includes(e.code))  keyDown.fwd=false;
+  if(['ArrowDown','KeyS'].includes(e.code))         keyDown.back=false;
+  if(['ArrowLeft','KeyA'].includes(e.code))         keyDown.left=false;
+  if(['ArrowRight','KeyD'].includes(e.code))        keyDown.right=false;
+});
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+function onResize(){
+  camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
 }
+window.addEventListener('resize',onResize);
 
-// ─── XR Session setup ────────────────────────────────────────────────────────
-async function startXRSession() {
-  if (!navigator.xr) {
-    dom.gateNote.textContent = 'WebXR não disponível neste browser.';
-    return false;
-  }
-  try {
-    const supported = await navigator.xr.isSessionSupported('immersive-vr');
-    if (!supported) {
-      dom.gateNote.textContent = 'immersive-vr não suportado aqui.';
-      return false;
+// ── XR Session ────────────────────────────────────────────────────────────────
+async function startXRSession(){
+  if(!navigator.xr){dom.gateNote.textContent='WebXR não disponível.';return false;}
+  try{
+    if(!await navigator.xr.isSessionSupported('immersive-vr')){
+      dom.gateNote.textContent='immersive-vr não suportado.';return false;
     }
-
-    // Request immersive-vr with local-floor (height tracking on Quest)
-    xrSession = await navigator.xr.requestSession('immersive-vr', {
-      requiredFeatures: ['local-floor'],
-      optionalFeatures: ['bounded-floor', 'hand-tracking'],
+    xrSession=await navigator.xr.requestSession('immersive-vr',{
+      requiredFeatures:['local-floor'],
+      optionalFeatures:['bounded-floor','hand-tracking'],
     });
-
-    // Wire Three.js XR manager to the session
     await renderer.xr.setSession(xrSession);
-
-    /**
-     * Get the reference space. 'local-floor' anchors origin at floor level,
-     * so the user's eyes are naturally at their correct height — no need to
-     * manually set camera Y.
-     */
-    xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
-
-    xrSession.addEventListener('end', () => {
-      xrSession  = null;
-      xrRefSpace = null;
-      mode       = 'screen';
+    xrSession.addEventListener('end',()=>{
+      xrSession=null;mode='screen';
       document.body.classList.remove('vr-mode');
     });
-
     return true;
-  } catch (err) {
-    console.warn('[XR]', err);
-    dom.gateNote.textContent = 'Não foi possível iniciar sessão VR: ' + err.message;
+  }catch(err){
+    console.warn('[XR]',err);
+    dom.gateNote.textContent='Erro VR: '+err.message;
     return false;
   }
 }
 
-// ─── Boot ─────────────────────────────────────────────────────────────────────
-async function boot(requestedMode) {
-  mode = requestedMode;
-
-  // Hide gate, show loader
+// ── Boot ──────────────────────────────────────────────────────────────────────
+async function boot(req){
+  mode=req;
   dom.gate.classList.add('hidden');
   dom.loader.classList.add('active');
-  loadPct = 0;
+  loadPct=0;
 
-  setLoad(10, 'preparando', 'iniciando renderer');
-  onResize();
+  setLoad(10,'preparando','iniciando');onResize();
+  setLoad(20,'céu','estrelas');buildSky();
+  setLoad(35,'terreno','relevo');buildTerrain();
+  setLoad(52,'rota','estrada');buildRoad();buildAuroras();buildGates();buildFlow();
+  setLoad(70,'mundo','torres');buildTowers();buildDust();buildCockpit();
+  setLoad(78,'controles','arma + controllers');buildWeaponAndControllers();
 
-  setLoad(20, 'céu', 'criando estrelas');   buildSky();
-  setLoad(35, 'terreno', 'relevo e malha'); buildTerrain();
-  setLoad(52, 'rota', 'estrada luminosa');  buildRoad(); buildAuroras(); buildGates(); buildFlow();
-  setLoad(70, 'mundo', 'torres e poeira');  buildTowers(); buildDust(); buildCockpit(); buildArquinha();
+  setLoad(82,'modo',mode==='vr'?'iniciando XR':'preparando tela');
+  if(mode==='vr'){const ok=await startXRSession();if(!ok)mode='screen';}
 
-  setLoad(82, 'modo', mode === 'vr' ? 'iniciando sessão XR' : 'preparando tela');
+  document.body.classList.toggle('vr-mode',mode==='vr');
+  dom.hintText.textContent=mode==='vr'
+    ?'Thumbstick dir. = mover/girar · Gatilho = atirar'
+    :'WASD mover · AD girar · Espaço avançar';
 
-  if (mode === 'vr') {
-    const ok = await startXRSession();
-    if (!ok) {
-      // Fallback to screen
-      mode = 'screen';
-    }
-  }
-
-  if (mode === 'vr') {
-    document.body.classList.add('vr-mode');
-    dom.hintText.textContent = 'Gatilho direito ou thumbstick para avançar';
-  } else {
-    document.body.classList.remove('vr-mode');
-  }
-
-  setLoad(96, 'finalizando', 'sincronizando');
+  setLoad(96,'finalizando','sync');
   updatePOV(0);
-  renderer.render(scene, camera);
+  renderer.render(scene,camera);
+  setLoad(100,'pronto',mode==='vr'?'aponte e atire!':'teclado ativo');
 
-  setLoad(100, 'pronto', mode === 'vr' ? 'pressione o gatilho direito' : 'scroll ou espaço para avançar');
-
-  setTimeout(() => {
+  setTimeout(()=>{
     document.body.classList.add('is-ready');
     dom.loader.classList.remove('active');
-    appStarted = true;
-    clock.start();
-
-    /**
-     * CRITICAL: Use renderer.setAnimationLoop instead of requestAnimationFrame.
-     * This is required for WebXR — the XR session drives its own loop and Three.js
-     * hooks into it via setAnimationLoop. The callback receives (timestamp, XRFrame)
-     * automatically when in VR mode.
-     */
+    appStarted=true;clock.start();
     renderer.setAnimationLoop(renderLoop);
-  }, 450);
+  },450);
 }
 
-// ─── Event listeners ─────────────────────────────────────────────────────────
-dom.enterVrBtn.addEventListener('click', () => boot('vr'));
-dom.screenBtn.addEventListener('click',  () => boot('screen'));
-
-window.addEventListener('resize', onResize);
-
-// ─── Sanity checks ───────────────────────────────────────────────────────────
-console.groupCollapsed('[HUBTOWN] Sanity checks');
-console.assert(renderer.xr.enabled,          'WebXR habilitado no renderer');
-console.assert(typeof RoadCurve === 'function','RoadCurve ok');
-console.groupEnd();
+dom.enterVrBtn.addEventListener('click',()=>boot('vr'));
+dom.screenBtn.addEventListener('click', ()=>boot('screen'));
 </script>
 </body>
 </html>
