@@ -53,6 +53,52 @@ body.vr-mode .overlay,body.vr-mode .hud,body.vr-mode .pbox,body.vr-mode .tui{dis
 .prow{display:flex;justify-content:space-between;margin-bottom:10px;color:rgba(213,224,255,.58);font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
 .trk{height:4px;background:rgba(213,224,255,.12);overflow:hidden}
 .fil{width:0%;height:100%;background:var(--soft);box-shadow:0 0 16px rgba(20,185,255,.9);transition:width .1s}
+
+/* ── PAIRING SCREEN ──────────────────────────────────────────────────────── */
+.pair{position:fixed;inset:0;z-index:101;display:grid;place-items:center;
+  background:radial-gradient(circle at 50% 40%,rgba(20,185,255,.14),transparent 40%),
+  linear-gradient(180deg,#010c1a,#020817);
+  opacity:0;visibility:hidden;transition:opacity .5s,visibility .5s}
+.pair.active{opacity:1;visibility:visible}
+.pair-panel{width:min(560px,calc(100vw - 44px));text-align:center}
+.pair-logo{margin-bottom:22px;font-size:18px;font-weight:900;letter-spacing:.44em;text-transform:uppercase;color:var(--blue);text-shadow:0 0 24px rgba(20,185,255,.5)}
+.pair-title{font-size:clamp(22px,3.5vw,36px);font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--soft);margin-bottom:8px}
+.pair-sub{font-size:12px;color:rgba(213,224,255,.5);letter-spacing:.18em;text-transform:uppercase;margin-bottom:36px}
+
+/* Controller diagram */
+.ctrl-row{display:flex;justify-content:center;gap:40px;margin-bottom:36px;align-items:flex-end}
+.ctrl-block{display:flex;flex-direction:column;align-items:center;gap:12px}
+.ctrl-icon{width:64px;height:88px;position:relative}
+.ctrl-icon svg{width:100%;height:100%}
+.ctrl-label{font-size:9px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;color:rgba(213,224,255,.4)}
+.ctrl-label.detected{color:var(--blue);text-shadow:0 0 12px rgba(20,185,255,.6)}
+
+/* Status items */
+.pair-checks{display:grid;gap:10px;margin-bottom:32px}
+.pair-check{display:flex;align-items:center;gap:14px;padding:12px 16px;
+  background:rgba(213,224,255,.04);border:1px solid rgba(213,224,255,.1);
+  clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px))}
+.pair-check-icon{width:22px;height:22px;border-radius:50%;border:2px solid rgba(213,224,255,.2);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;
+  transition:background .4s,border-color .4s}
+.pair-check-icon.ok{background:var(--blue);border-color:var(--blue);box-shadow:0 0 14px rgba(20,185,255,.7)}
+.pair-check-text{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:rgba(213,224,255,.5);text-align:left;transition:color .4s}
+.pair-check-text.ok{color:var(--soft)}
+
+/* Scanning pulse ring */
+.pair-scan{width:80px;height:80px;margin:0 auto 28px;position:relative;display:flex;align-items:center;justify-content:center}
+.pair-scan-ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(20,185,255,.3);animation:pring 1.6s ease-out infinite}
+.pair-scan-ring:nth-child(2){animation-delay:.5s}
+.pair-scan-ring:nth-child(3){animation-delay:1s}
+.pair-scan-dot{width:16px;height:16px;border-radius:50%;background:var(--blue);box-shadow:0 0 20px rgba(20,185,255,.9);z-index:1}
+.pair-scan.done .pair-scan-ring{animation:none;border-color:rgba(20,185,255,.6)}
+.pair-scan.done .pair-scan-dot{background:#00ffaa;box-shadow:0 0 24px rgba(0,255,170,.9)}
+@keyframes pring{0%{transform:scale(1);opacity:.8}100%{transform:scale(2.2);opacity:0}}
+
+/* Auto-proceed bar */
+.pair-bar-wrap{height:4px;background:rgba(213,224,255,.08);overflow:hidden;margin-top:8px}
+.pair-bar{height:100%;width:0%;background:var(--blue);box-shadow:0 0 12px rgba(20,185,255,.8);transition:width linear}
+.pair-msg{margin-top:14px;font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:rgba(213,224,255,.45);min-height:16px}
 </style>
 </head>
 <body>
@@ -69,6 +115,64 @@ body.vr-mode .overlay,body.vr-mode .hud,body.vr-mode .pbox,body.vr-mode .tui{dis
     <div class="note" id="gNote">Tela: WASD mover · AD girar · Espaço avançar</div>
   </div>
 </section>
+
+<!-- ── PAIRING SCREEN ─────────────────────────────────────────────────────── -->
+<div class="pair" id="pairScreen">
+  <div class="pair-panel">
+    <div class="pair-logo">HUBTOWN</div>
+    <div class="pair-title">Reconhecimento de Controles</div>
+    <div class="pair-sub">aguardando meta quest touch controllers</div>
+    <div class="pair-scan" id="pairScan">
+      <div class="pair-scan-ring"></div>
+      <div class="pair-scan-ring"></div>
+      <div class="pair-scan-ring"></div>
+      <div class="pair-scan-dot"></div>
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-block">
+        <div class="ctrl-icon">
+          <svg viewBox="0 0 64 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 12 Q12 12 10 24 L6 60 Q4 72 14 78 L28 82 Q36 84 40 76 L50 52 Q56 38 48 26 L40 16 Q34 8 28 10 Z" stroke="rgba(213,224,255,0.25)" stroke-width="1.5" fill="rgba(20,185,255,0.04)" id="svgLeft"/>
+            <circle cx="22" cy="38" r="7" stroke="rgba(213,224,255,0.2)" stroke-width="1.2" fill="none"/>
+            <rect x="30" y="24" width="6" height="6" rx="1" stroke="rgba(213,224,255,0.2)" stroke-width="1" fill="none"/>
+          </svg>
+        </div>
+        <div class="ctrl-label" id="lblLeft">esquerdo</div>
+      </div>
+      <div class="ctrl-block">
+        <div class="ctrl-icon">
+          <svg viewBox="0 0 64 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M44 12 Q52 12 54 24 L58 60 Q60 72 50 78 L36 82 Q28 84 24 76 L14 52 Q8 38 16 26 L24 16 Q30 8 36 10 Z" stroke="rgba(213,224,255,0.25)" stroke-width="1.5" fill="rgba(20,185,255,0.04)" id="svgRight"/>
+            <circle cx="42" cy="38" r="7" stroke="rgba(213,224,255,0.2)" stroke-width="1.2" fill="none"/>
+            <rect x="28" y="24" width="6" height="6" rx="1" stroke="rgba(213,224,255,0.2)" stroke-width="1" fill="none"/>
+            <rect x="36" y="24" width="6" height="6" rx="1" stroke="rgba(213,224,255,0.2)" stroke-width="1" fill="none"/>
+          </svg>
+        </div>
+        <div class="ctrl-label" id="lblRight">direito</div>
+      </div>
+    </div>
+    <div class="pair-checks">
+      <div class="pair-check">
+        <div class="pair-check-icon" id="icoSession">1</div>
+        <div class="pair-check-text" id="txtSession">Sessão WebXR imersiva iniciada</div>
+      </div>
+      <div class="pair-check">
+        <div class="pair-check-icon" id="icoLeft">2</div>
+        <div class="pair-check-text" id="txtLeft">Controle esquerdo detectado</div>
+      </div>
+      <div class="pair-check">
+        <div class="pair-check-icon" id="icoRight">3</div>
+        <div class="pair-check-text" id="txtRight">Controle direito detectado</div>
+      </div>
+      <div class="pair-check">
+        <div class="pair-check-icon" id="icoWeapon">4</div>
+        <div class="pair-check-text" id="txtWeapon">Arma acoplada à mão direita</div>
+      </div>
+    </div>
+    <div class="pair-bar-wrap"><div class="pair-bar" id="pairBar"></div></div>
+    <div class="pair-msg" id="pairMsg">escaneando controladores...</div>
+  </div>
+</div>
 
 <div class="loader" id="loader">
   <div class="panel">
@@ -109,6 +213,14 @@ const D={
   gate:$('gate'),vrBtn:$('vrBtn'),scBtn:$('scBtn'),gNote:$('gNote'),
   loader:$('loader'),lStep:$('lStep'),lPct:$('lPct'),lFill:$('lFill'),lStat:$('lStat'),
   fil:$('fil'),pct:$('pct'),hAlt:$('hAlt'),hSpd:$('hSpd'),hShots:$('hShots'),hMode:$('hMode'),hint:$('hint'),
+  // pairing screen
+  pairScreen:$('pairScreen'),pairScan:$('pairScan'),pairBar:$('pairBar'),pairMsg:$('pairMsg'),
+  icoSession:$('icoSession'),txtSession:$('txtSession'),
+  icoLeft:$('icoLeft'),    txtLeft:$('txtLeft'),
+  icoRight:$('icoRight'),  txtRight:$('txtRight'),
+  icoWeapon:$('icoWeapon'),txtWeapon:$('txtWeapon'),
+  lblLeft:$('lblLeft'),    lblRight:$('lblRight'),
+  svgLeft:$('svgLeft'),    svgRight:$('svgRight'),
 };
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -533,6 +645,16 @@ function loop(ts,xrFrame){
   if(!started) return;
   const delta=Math.min(clock.getDelta(),.05);
   const el=clock.elapsedTime;
+  const now=performance.now();
+
+  // ── Pairing screen update (runs before main game logic) ──────────────────
+  // While pairUpdateFn is set, we're in the pairing phase.
+  // Render the scene with the 3D panel visible, but skip game input/movement.
+  if(pairUpdateFn){
+    pairUpdateFn(now);
+    renderer.render(scene,cam);
+    return;
+  }
 
   let sX=0,sY=0;
 
@@ -601,9 +723,278 @@ async function startXR(){
       optionalFeatures:['bounded-floor','hand-tracking'],
     });
     await renderer.xr.setSession(xrSess);
-    xrSess.addEventListener('end',()=>{xrSess=null;mode='screen';document.body.classList.remove('vr-mode');});
+    xrSess.addEventListener('end',()=>{
+      xrSess=null;mode='screen';
+      document.body.classList.remove('vr-mode');
+      // If user exits VR during pairing, resolve and continue to screen mode
+      if(pairUpdateFn){
+        pairUpdateFn=null;
+        if(pairPanel3D) pairPanel3D.visible=false;
+        if(pairResolve){const r=pairResolve;pairResolve=null;r();}
+      }
+    });
     return true;
   }catch(e){console.warn('[XR]',e);D.gNote.textContent='Erro VR: '+e.message;return false;}
+}
+
+// ── PAIRING SCREEN ───────────────────────────────────────────────────────────
+/**
+ * VR-NATIVE pairing screen.
+ *
+ * IMPORTANT: When in WebXR immersive mode, only the WebGL canvas is rendered
+ * to the headset — DOM 2D elements are invisible inside the Quest. So we
+ * build the pairing UI as a 3D panel attached to the camera in world space.
+ *
+ * Flow:
+ *   1. Show 3D panel in front of user inside VR
+ *   2. Render frames manually (renderer.setAnimationLoop) while waiting
+ *   3. Listen to xrSession.inputsourceschange + poll for gripR/rayR
+ *   4. When all 4 checks pass, animate the bar and resolve()
+ *   5. Hide the panel; main loop takes over
+ *
+ * In screen mode the 2D DOM pairing screen is shown instead (same checks).
+ */
+
+let pairPanel3D=null;        // 3D group with pairing UI
+let pairUpdateFn=null;        // Function called every frame during pairing
+let pairResolve=null;         // Promise resolver
+
+function buildPairingPanel3D(){
+  const panel=new THREE.Group();
+  panel.name='pair-panel-3d';
+
+  // Background plane (semi-transparent dark blue)
+  const bg=new THREE.Mesh(
+    new THREE.PlaneGeometry(1.2,0.85),
+    new THREE.MeshBasicMaterial({color:0x020817,transparent:true,opacity:0.85,side:THREE.DoubleSide,depthWrite:false})
+  );
+  panel.add(bg);
+
+  // Border frame (slightly bigger plane behind)
+  const border=new THREE.Mesh(
+    new THREE.PlaneGeometry(1.22,0.87),
+    new THREE.MeshBasicMaterial({color:0x14b9ff,transparent:true,opacity:0.4,side:THREE.DoubleSide,depthWrite:false})
+  );
+  border.position.z=-0.001;
+  panel.add(border);
+
+  // Title text using a canvas texture
+  function makeTextSprite(text,fontSize,color,width=512,height=64){
+    const c=document.createElement('canvas');
+    c.width=width; c.height=height;
+    const ctx=c.getContext('2d');
+    ctx.fillStyle='rgba(0,0,0,0)';
+    ctx.fillRect(0,0,width,height);
+    ctx.font=`900 ${fontSize}px Courier New`;
+    ctx.fillStyle=color;
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillText(text,width/2,height/2);
+    const tex=new THREE.CanvasTexture(c);
+    tex.needsUpdate=true;
+    return tex;
+  }
+
+  // Logo / title
+  const logoTex=makeTextSprite('HUBTOWN',38,'#14b9ff',512,64);
+  const logoMesh=new THREE.Mesh(
+    new THREE.PlaneGeometry(0.4,0.05),
+    new THREE.MeshBasicMaterial({map:logoTex,transparent:true,depthWrite:false})
+  );
+  logoMesh.position.set(0,0.32,0.001);
+  panel.add(logoMesh);
+
+  const titleTex=makeTextSprite('RECONHECIMENTO DE CONTROLES',26,'#d5e0ff',1024,48);
+  const titleMesh=new THREE.Mesh(
+    new THREE.PlaneGeometry(0.85,0.04),
+    new THREE.MeshBasicMaterial({map:titleTex,transparent:true,depthWrite:false})
+  );
+  titleMesh.position.set(0,0.24,0.001);
+  panel.add(titleMesh);
+
+  // 4 check rows — each with an indicator circle and a text plane
+  // Stored in panel.userData so the update fn can mutate them
+  const checks=[];
+  const labels=['Sessao WebXR ativa','Controle esquerdo','Controle direito','Arma na mao direita'];
+  for(let i=0;i<4;i++){
+    const row=new THREE.Group();
+    row.position.set(0, 0.10 - i*0.10, 0.001);
+
+    // Indicator ring
+    const ringGeo=new THREE.RingGeometry(0.02,0.028,32);
+    const ringMat=new THREE.MeshBasicMaterial({color:0x445566,transparent:true,opacity:0.6,side:THREE.DoubleSide,depthWrite:false});
+    const ring=new THREE.Mesh(ringGeo,ringMat);
+    ring.position.x=-0.4;
+    row.add(ring);
+
+    // Solid disk inside (hidden until checked)
+    const diskGeo=new THREE.CircleGeometry(0.018,32);
+    const diskMat=new THREE.MeshBasicMaterial({color:0x14b9ff,transparent:true,opacity:0,depthWrite:false});
+    const disk=new THREE.Mesh(diskGeo,diskMat);
+    disk.position.x=-0.4;
+    disk.position.z=0.001;
+    row.add(disk);
+
+    // Text label
+    const txtTex=makeTextSprite(labels[i].toUpperCase(),24,'#8ba3c7',1024,40);
+    const txtMesh=new THREE.Mesh(
+      new THREE.PlaneGeometry(0.7,0.028),
+      new THREE.MeshBasicMaterial({map:txtTex,transparent:true,depthWrite:false})
+    );
+    txtMesh.position.x=0.05;
+    row.add(txtMesh);
+
+    panel.add(row);
+    checks.push({ring,ringMat,disk,diskMat,txtMesh,labelText:labels[i],checked:false});
+  }
+
+  // Progress bar (starts at 0 width)
+  const barBgGeo=new THREE.PlaneGeometry(0.7,0.012);
+  const barBg=new THREE.Mesh(barBgGeo,new THREE.MeshBasicMaterial({color:0x0a1a2e,transparent:true,opacity:0.8,depthWrite:false}));
+  barBg.position.set(0,-0.32,0.001);
+  panel.add(barBg);
+
+  const barFill=new THREE.Mesh(
+    new THREE.PlaneGeometry(0.7,0.012),
+    new THREE.MeshBasicMaterial({color:0x14b9ff,transparent:true,opacity:1,depthWrite:false})
+  );
+  barFill.position.set(-0.35,-0.32,0.002); // anchored at left
+  barFill.scale.x=0.001; // start near zero
+  panel.add(barFill);
+
+  // Glow pulse around panel (additive blue)
+  const glow=new THREE.Mesh(
+    new THREE.PlaneGeometry(1.4,1.05),
+    new THREE.MeshBasicMaterial({color:0x14b9ff,transparent:true,opacity:0.15,blending:THREE.AdditiveBlending,depthWrite:false})
+  );
+  glow.position.z=-0.002;
+  panel.add(glow);
+
+  panel.userData={checks,barFill,glow};
+
+  // Position panel 1.5m in front of camera, slightly below eye level
+  panel.position.set(0,-0.05,-1.5);
+  panel.visible=false;
+
+  // Attach to camera so it follows head naturally
+  cam.add(panel);
+
+  return panel;
+}
+
+function runPairingScreen(){
+  return new Promise(resolve=>{
+    pairResolve=resolve;
+
+    // Build the 3D panel if not yet built
+    if(!pairPanel3D) pairPanel3D=buildPairingPanel3D();
+    pairPanel3D.visible=true;
+
+    // State
+    let hasLeft=false, hasRight=false, hasWeapon=false;
+    let resolved=false;
+    let countdownStart=0;
+    const COUNTDOWN_MS=1500;
+    const SAFETY_MS=10000;
+    const startTime=performance.now();
+
+    const {checks,barFill,glow}=pairPanel3D.userData;
+
+    // Mark check N as OK (turn ring blue + show disk + brighten text)
+    function markCheck(i){
+      if(checks[i].checked) return;
+      checks[i].checked=true;
+      checks[i].ringMat.color.setHex(0x14b9ff);
+      checks[i].ringMat.opacity=1;
+      checks[i].diskMat.opacity=1;
+      // Update text to brighter color by regenerating the texture
+      const c=document.createElement('canvas');
+      c.width=1024; c.height=40;
+      const ctx=c.getContext('2d');
+      ctx.font='900 24px Courier New';
+      ctx.fillStyle='#d5e0ff';
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      ctx.fillText(('OK · '+checks[i].labelText).toUpperCase(),512,20);
+      checks[i].txtMesh.material.map.image=c;
+      checks[i].txtMesh.material.map.needsUpdate=true;
+    }
+
+    // Step 1 — session is open the moment this function runs
+    markCheck(0);
+
+    function evalNow(){
+      if(!xrSess) return;
+      // Check input sources
+      for(const src of xrSess.inputSources){
+        if(src.handedness==='left'  && !hasLeft){  hasLeft=true;  markCheck(1); }
+        if(src.handedness==='right' && !hasRight){ hasRight=true; markCheck(2); }
+      }
+      // Step 4 depends on Three.js wiring gripR (async via 'connected' event)
+      if(hasRight && gripR && !hasWeapon){
+        hasWeapon=true;
+        markCheck(3);
+      }
+      if(hasLeft && hasRight && hasWeapon && !countdownStart){
+        countdownStart=performance.now();
+      }
+    }
+
+    // ── Per-frame update — called from main render loop while pairing ──────
+    pairUpdateFn=(now)=>{
+      if(resolved) return;
+      evalNow();
+
+      // Pulse glow
+      glow.material.opacity=0.10+Math.sin(now*0.003)*0.06;
+
+      // Animate progress bar
+      let progress=0;
+      if(countdownStart){
+        progress=clamp((now-countdownStart)/COUNTDOWN_MS,0,1);
+      } else {
+        // Show partial progress based on how many checks are done
+        const done=checks.filter(c=>c.checked).length;
+        progress=done/4 * 0.5; // bar fills to 50% as checks come in
+      }
+      barFill.scale.x=Math.max(0.001,progress);
+      barFill.position.x=-0.35 + progress*0.35; // keep anchored at left
+
+      // Safety timeout — auto-skip if no controllers after SAFETY_MS
+      if(now-startTime>SAFETY_MS && !resolved){
+        finish();
+        return;
+      }
+
+      // Done countdown
+      if(countdownStart && progress>=1 && !resolved){
+        finish();
+      }
+    };
+
+    function finish(){
+      resolved=true;
+      pairUpdateFn=null;
+      pairPanel3D.visible=false;
+      pairResolve=null;
+      resolve();
+    }
+
+    // Also listen to XR event for fast detection
+    if(xrSess){
+      xrSess.addEventListener('inputsourceschange',evalNow);
+      // Auto-cleanup after resolve
+      const cleanup=()=>{
+        if(xrSess) xrSess.removeEventListener('inputsourceschange',evalNow);
+      };
+      // Hook cleanup into the original resolve
+      const origResolve=resolve;
+      resolve=(...args)=>{cleanup(); origResolve(...args);};
+    }
+
+    // First eval immediately
+    evalNow();
+  });
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
@@ -619,7 +1010,12 @@ async function boot(req){
   setL(78,'controllers','arma + tracking');buildControllerSystem();
   setL(82,'modo',mode==='vr'?'iniciando XR':'tela');
 
-  if(mode==='vr'){const ok=await startXR();if(!ok)mode='screen';}
+  if(mode==='vr'){
+    const ok=await startXR();
+    if(!ok){
+      mode='screen';
+    }
+  }
   document.body.classList.toggle('vr-mode',mode==='vr');
   D.hint.textContent=mode==='vr'
     ?'Thumbstick dir = mover/girar · Gatilho = atirar'
@@ -627,14 +1023,22 @@ async function boot(req){
 
   setL(96,'finalizando','sync');
   updatePOV(0);renderer.render(scene,cam);
-  setL(100,'pronto',mode==='vr'?'aponte e atire!':'teclado ativo');
+  setL(100,'pronto',mode==='vr'?'reconhecendo controles...':'teclado ativo');
 
-  setTimeout(()=>{
-    document.body.classList.add('is-ready');
-    D.loader.classList.remove('active');
-    started=true;clock.start();
-    renderer.setAnimationLoop(loop); // THREE.js WebXR requires setAnimationLoop
-  },450);
+  // Hide loader, mark ready, start render loop FIRST
+  // (loop must be running for the 3D pairing panel to render in VR)
+  document.body.classList.add('is-ready');
+  D.loader.classList.remove('active');
+  started=true; clock.start();
+  renderer.setAnimationLoop(loop);
+
+  // ── PAIRING PHASE (only in VR mode) ──────────────────────────────────────
+  // Now that the loop is running, show the 3D pairing panel inside VR.
+  // The loop will see pairUpdateFn !== null and render only the panel + scene
+  // until pairing completes.
+  if(mode==='vr' && xrSess){
+    await runPairingScreen();
+  }
 }
 
 D.vrBtn.addEventListener('click',()=>boot('vr'));
